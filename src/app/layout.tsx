@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/layout/navbar";
+import { AuthProvider } from "@/contexts/auth-context";
+import { AuthGuard } from "@/components/auth/auth-guard";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -17,12 +19,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </head>
       <body className={inter.className}>
-        <Navbar />
-        <main className="pt-14 pb-20 min-h-screen bg-background">
-          <div className="max-w-2xl mx-auto">
-            {children}
-          </div>
-        </main>
+        <AuthProvider>
+          <Navbar />
+          <AuthGuard>
+            <main className="pt-14 pb-20 min-h-screen bg-background">
+              <div className="max-w-2xl mx-auto">
+                {children}
+              </div>
+            </main>
+          </AuthGuard>
+        </AuthProvider>
       </body>
     </html>
   );

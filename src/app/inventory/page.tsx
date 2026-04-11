@@ -7,6 +7,7 @@ import { DailyInputTab } from "./daily-input-tab";
 import { MonthlyReportTab } from "./monthly-report-tab";
 import { supabase } from "@/lib/supabase";
 import { Product, ProductCategory } from "@/types/database";
+import { useAuth } from "@/contexts/auth-context";
 
 type Tab = "daily" | "monthly";
 
@@ -15,12 +16,26 @@ function getTodayStr() {
 }
 
 export default function InventoryPage() {
+  const { profile } = useAuth();
   const [tab, setTab] = useState<Tab>("daily");
-  const [category, setCategory] = useState<ProductCategory>("Bếp");
   const [date, setDate] = useState(getTodayStr());
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const { toast, showToast, hideToast } = useToast();
+
+  // Determine category: employees are locked to their category
+  const isEmployee = profile?.role === "employee";
+  const defaultCategory: ProductCategory = isEmployee && profile?.category
+    ? (profile.category as ProductCategory)
+    : "Bếp";
+  const [category, setCategory] = useState<ProductCategory>(defaultCategory);
+
+  // Sync category when profile loads
+  useEffect(() => {
+    if (isEmployee && profile?.category) {
+      setCategory(profile.category as ProductCategory);
+    }
+  }, [isEmployee, profile?.category]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchProducts = useCallback(async () => {
     const { data, error } = await supabase
@@ -49,44 +64,55 @@ export default function InventoryPage() {
       <div className="px-4 pt-4 pb-3 space-y-3">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">Tồn kho</h1>
-          <div className="flex gap-1 bg-muted rounded-lg p-1">
-            <button
-              onClick={() => setTab("daily")}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                tab === "daily" ? "bg-white shadow text-foreground" : "text-muted-foreground"
-              }`}
-            >
-              Nhập hàng ngày
-            </button>
-            <button
-              onClick={() => setTab("monthly")}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                tab === "monthly" ? "bg-white shadow text-foreground" : "text-muted-foreground"
-              }`}
-            >
-              Báo cáo tháng
-            </button>
-          </div>
+          {/* Employees only see daily input, not monthly report for manager view */}
+          {!isEmployee && (
+            <div className="flex gap-1 bg-muted rounded-lg p-1">
+              <button
+                onClick={() => setTab("daily")}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  tab === "daily" ? "bg-white shadow text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                Nhập hàng ngày
+              </button>
+              <button
+                onClick={() => setTab("monthly")}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  tab === "monthly" ? "bg-white shadow text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                Báo cáo tháng
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Category filter */}
-        <div className="flex gap-2">
-          {(["Bếp", "Quầy"] as ProductCategory[]).map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setCategory(cat)}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
-                category === cat
-                  ? cat === "Bếp"
-                    ? "bg-orange-500 text-white"
-                    : "bg-blue-500 text-white"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {cat === "Bếp" ? "🍳 Bếp" : "☕ Quầy"}
-            </button>
-          ))}
-        </div>
+        {/* Category filter — hidden for employees (locked) */}
+        {isEmployee ? (
+          <div className={`flex items-center justify-center py-2.5 rounded-xl text-sm font-semibold ${
+            category === "Bếp" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
+          }`}>
+            {category === "Bếp" ? "🍳 Khu vực Bếp" : "☕ Khu vực Quầy"}
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            {(["Bếp", "Quầy"] as ProductCategory[]).map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setCategory(cat)}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                  category === cat
+                    ? cat === "Bếp"
+                      ? "bg-orange-500 text-white"
+                      : "bg-blue-500 text-white"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {cat === "Bếp" ? "🍳 Bếp" : "☕ Quầy"}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Date picker (daily only) */}
         {tab === "daily" && (
