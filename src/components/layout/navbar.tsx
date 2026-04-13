@@ -20,11 +20,12 @@ import {
 type NavItem = { href: string; label: string; icon: React.ElementType; roles: string[] };
 
 const ALL_NAV: NavItem[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "manager"] },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin"] },
   { href: "/products", label: "Hàng hóa", icon: Package, roles: ["admin"] },
   { href: "/inventory", label: "Tồn kho", icon: BarChart3, roles: ["admin", "manager", "employee"] },
   { href: "/recipes", label: "Công thức", icon: BookOpen, roles: ["admin"] },
-  { href: "/fabi", label: "Fabi", icon: FileSpreadsheet, roles: ["admin", "manager"] },
+  { href: "/reports", label: "Đối soát", icon: FileSpreadsheet, roles: ["manager"] },
+  { href: "/fabi", label: "Fabi", icon: FileSpreadsheet, roles: ["admin"] },
   { href: "/admin", label: "Tài khoản", icon: ShieldCheck, roles: ["admin"] },
 ];
 

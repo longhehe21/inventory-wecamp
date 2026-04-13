@@ -19,7 +19,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
     // Logged in + on login page → redirect based on role
     if (user && profile && pathname === "/login") {
-      router.replace(profile.role === "employee" ? "/inventory" : "/");
+      if (profile.role === "employee") router.replace("/inventory");
+      else if (profile.role === "manager") router.replace("/inventory");
+      else router.replace("/");
       return;
     }
 
@@ -31,13 +33,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         router.replace("/inventory");
       }
     } else if (profile.role === "manager") {
-      // Managers cannot access admin, products, or recipes
-      if (
-        pathname.startsWith("/admin") ||
-        pathname.startsWith("/products") ||
-        pathname.startsWith("/recipes")
-      ) {
-        router.replace("/");
+      // Managers can only access /inventory and /reports
+      const allowed = ["/inventory", "/reports"];
+      if (!allowed.some((r) => pathname.startsWith(r))) {
+        router.replace("/inventory");
       }
     }
     // Admin: no restrictions
