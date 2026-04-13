@@ -29,10 +29,13 @@ interface ProductFormProps {
 const CATEGORIES: ProductCategory[] = ["Bếp", "Quầy"];
 
 const BASE_UNITS: { value: ProductUnit; label: string }[] = [
-  { value: "g",  label: "g (gram)" },
-  { value: "kg", label: "kg (kilogram)" },
-  { value: "ml", label: "ml (mililít)" },
-  { value: "l",  label: "l (lít)" },
+  { value: "g",    label: "g (gram)" },
+  { value: "kg",   label: "kg (kilogram)" },
+  { value: "ml",   label: "ml (mililít)" },
+  { value: "l",    label: "l (lít)" },
+  { value: "con",  label: "con (con gà, con cá...)" },
+  { value: "cái",  label: "cái (cái trứng, cái...)" },
+  { value: "phần", label: "phần (phần ăn)" },
 ];
 
 const PACKAGE_UNITS: { value: PackageUnit; label: string }[] = [

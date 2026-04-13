@@ -1,5 +1,5 @@
 export type ProductCategory = "Bếp" | "Quầy";
-export type ProductUnit = "g" | "kg" | "l" | "ml";
+export type ProductUnit = "g" | "kg" | "l" | "ml" | "con" | "cái" | "phần";
 export type PackageUnit = "túi" | "hộp" | "chai" | "gói" | "lon" | "thùng" | "cái" | "kg" | "lít";
 
 export interface Product {
