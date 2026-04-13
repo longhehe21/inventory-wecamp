@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Save, Upload, RefreshCw, Package } from "lucide-react";
+import { Save, Upload, RefreshCw, Package, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { Product, InventoryDaily } from "@/types/database";
@@ -146,6 +146,17 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
     buildRows(products, date);
   };
 
+  // Tải file Excel mẫu với danh sách hàng hóa hiện tại
+  const handleDownloadTemplate = () => {
+    const header = ["Tên hàng hóa", "Nhập hàng", "Tồn cuối"];
+    const dataRows = products.map((p) => [p.name, "", ""]);
+    const ws = XLSX.utils.aoa_to_sheet([header, ...dataRows]);
+    ws["!cols"] = [{ wch: 25 }, { wch: 12 }, { wch: 12 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Tồn kho");
+    XLSX.writeFile(wb, `ton-kho-${date}.xlsx`);
+  };
+
   // Excel import: expect columns: Tên hàng hóa | Nhập hàng | Tồn cuối
   const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -211,35 +222,23 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
     <div className="space-y-3">
       {/* Action buttons */}
       <div className="px-4 flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5"
-          onClick={() => fileRef.current?.click()}
-        >
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={handleDownloadTemplate}>
+          <Download className="h-4 w-4" />
+          Mẫu
+        </Button>
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => fileRef.current?.click()}>
           <Upload className="h-4 w-4" />
-          Import Excel
+          Import
         </Button>
         <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelUpload} />
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5"
-          onClick={() => buildRows(products, date)}
-          disabled={loading}
-        >
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => buildRows(products, date)} disabled={loading}>
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           Làm mới
         </Button>
         <Button size="sm" className="gap-1.5 ml-auto" onClick={handleSaveAll} disabled={saving}>
           <Save className="h-4 w-4" />
-          {saving ? "Đang lưu..." : "Lưu tất cả"}
+          {saving ? "Đang lưu..." : "Lưu"}
         </Button>
-      </div>
-
-      {/* Template hint */}
-      <div className="mx-4 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700">
-        Excel mẫu: cột A=Tên hàng hóa, B=Nhập hàng, C=Tồn cuối
       </div>
 
       {/* Inventory table */}
