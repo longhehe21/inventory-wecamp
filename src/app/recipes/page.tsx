@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, BookOpen, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Pencil, Trash2, BookOpen, ChevronDown, ChevronUp, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Toast, useToast } from "@/components/ui/toast";
@@ -8,6 +8,7 @@ import { RecipeForm } from "./recipe-form";
 import { supabase } from "@/lib/supabase";
 import { Recipe, Product } from "@/types/database";
 import { formatNumber } from "@/lib/utils";
+import * as XLSX from "xlsx";
 
 export default function RecipesPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -51,6 +52,37 @@ export default function RecipesPage() {
   const getProductUnit = (productId: string) =>
     products.find((p) => p.id === productId)?.unit ?? "";
 
+  const handleDownloadTemplate = () => {
+    const header = ["Tên món", "Tên nguyên liệu", "Số lượng", "Đơn vị"];
+    const rows: (string | number)[][] = [];
+
+    if (recipes.length > 0) {
+      // Xuất các công thức hiện có làm mẫu
+      recipes.forEach((recipe) => {
+        recipe.ingredients.forEach((ing) => {
+          rows.push([
+            recipe.name,
+            getProductName(ing.product_id),
+            ing.quantity,
+            getProductUnit(ing.product_id),
+          ]);
+        });
+      });
+    } else {
+      // Mẫu trống
+      rows.push(["Cà phê sữa", "Cà phê hạt", 15, "g"]);
+      rows.push(["Cà phê sữa", "Sữa đặc", 20, "ml"]);
+      rows.push(["Trà sữa", "Trà", 10, "g"]);
+      rows.push(["Trà sữa", "Sữa tươi", 100, "ml"]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    ws["!cols"] = [{ wch: 20 }, { wch: 22 }, { wch: 12 }, { wch: 10 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Công thức");
+    XLSX.writeFile(wb, "mau-cong-thuc.xlsx");
+  };
+
   return (
     <div className="px-4 py-4 space-y-4">
       <div className="flex items-center justify-between">
@@ -58,14 +90,16 @@ export default function RecipesPage() {
           <h1 className="text-xl font-bold">Công thức</h1>
           <p className="text-xs text-muted-foreground mt-0.5">{recipes.length} món</p>
         </div>
-        <Button
-          size="lg"
-          className="gap-2"
-          onClick={() => { setEditRecipe(null); setShowForm(true); }}
-        >
-          <Plus className="h-5 w-5" />
-          Thêm mới
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={handleDownloadTemplate}>
+            <Download className="h-4 w-4" />
+            Mẫu
+          </Button>
+          <Button size="sm" className="gap-1.5" onClick={() => { setEditRecipe(null); setShowForm(true); }}>
+            <Plus className="h-4 w-4" />
+            Thêm mới
+          </Button>
+        </div>
       </div>
 
       {loading ? (

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Upload, Trash2, FileSpreadsheet, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { Upload, Trash2, FileSpreadsheet, Calendar, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Toast, useToast } from "@/components/ui/toast";
@@ -30,6 +30,22 @@ export default function FabiPage() {
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const { toast, showToast, hideToast } = useToast();
+
+  const handleDownloadTemplate = () => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const header = ["Ngày", "Tên món", "Số lượng"];
+    const rows = [
+      [todayStr, "Cà phê sữa", 10],
+      [todayStr, "Trà sữa", 8],
+      [todayStr, "Cà phê đen", 5],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    ws["!cols"] = [{ wch: 14 }, { wch: 25 }, { wch: 12 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Fabi");
+    XLSX.writeFile(wb, "mau-fabi.xlsx");
+  };
 
   const fetchSales = useCallback(async () => {
     setLoading(true);
@@ -214,10 +230,16 @@ export default function FabiPage() {
           <h1 className="text-xl font-bold">Dữ liệu Fabi</h1>
           <p className="text-xs text-muted-foreground mt-0.5">Doanh thu từ máy POS</p>
         </div>
-        <Button size="lg" className="gap-2" onClick={() => fileRef.current?.click()} disabled={uploading}>
-          <Upload className="h-5 w-5" />
-          {uploading ? "Đang xử lý..." : "Import Excel"}
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={handleDownloadTemplate}>
+            <Download className="h-4 w-4" />
+            Mẫu
+          </Button>
+          <Button size="sm" className="gap-1.5" onClick={() => fileRef.current?.click()} disabled={uploading}>
+            <Upload className="h-4 w-4" />
+            {uploading ? "Đang xử lý..." : "Import"}
+          </Button>
+        </div>
         <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelUpload} />
       </div>
 
