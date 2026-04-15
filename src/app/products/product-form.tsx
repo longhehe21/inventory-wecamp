@@ -26,7 +26,7 @@ interface ProductFormProps {
   onError: (message: string) => void;
 }
 
-const CATEGORIES: ProductCategory[] = ["Bếp", "Quầy", "Lễ tân"];
+const CATEGORIES: ProductCategory[] = ["Bếp", "Quầy"];
 
 const BASE_UNITS: { value: ProductUnit; label: string }[] = [
   { value: "g",    label: "g (gram)" },
@@ -128,7 +128,7 @@ export function ProductForm({ product, onClose, onSaved, onError }: ProductFormP
               <SelectContent>
                 {CATEGORIES.map((cat) => (
                   <SelectItem key={cat} value={cat}>
-                    {cat === "Bếp" ? "🍳 Bếp" : cat === "Quầy" ? "☕ Quầy" : "🛎️ Lễ tân"}
+                    {cat === "Bếp" ? "🍳 Bếp" : "☕ Quầy"}
                   </SelectItem>
                 ))}
               </SelectContent>

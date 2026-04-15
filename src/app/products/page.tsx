@@ -13,7 +13,7 @@ import { formatNumber } from "@/lib/utils";
 import * as XLSX from "xlsx";
 
 const VALID_UNITS: ProductUnit[] = ["g", "kg", "l", "ml", "con", "cái", "phần"];
-const VALID_CATEGORIES: ProductCategory[] = ["Bếp", "Quầy", "Lễ tân"];
+const VALID_CATEGORIES: ProductCategory[] = ["Bếp", "Quầy"];
 const VALID_PACKAGE_UNITS: PackageUnit[] = ["túi", "hộp", "chai", "gói", "lon", "thùng", "cái", "kg", "lít"];
 
 export default function ProductsPage() {
@@ -61,7 +61,6 @@ export default function ProductsPage() {
       ["Gà nguyên con", "Bếp", "con", "", ""],
       ["Sữa tươi", "Quầy", "ml", "hộp", "200"],
       ["Cà phê hạt", "Quầy", "g", "túi", "500"],
-      ["Nước suối", "Lễ tân", "ml", "chai", "500"],
     ]);
     ws["!cols"] = [{ wch: 25 }, { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 25 }];
     const wb = XLSX.utils.book_new();
@@ -166,7 +165,6 @@ export default function ProductsPage() {
 
   const bepCount = products.filter((p) => p.category === "Bếp").length;
   const quayCount = products.filter((p) => p.category === "Quầy").length;
-  const letanCount = products.filter((p) => p.category === "Lễ tân").length;
 
   return (
     <div className="px-4 py-4 space-y-4">
@@ -174,7 +172,7 @@ export default function ProductsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">Hàng hóa</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">{bepCount} Bếp · {quayCount} Quầy · {letanCount} Lễ tân</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{bepCount} Bếp · {quayCount} Quầy</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" className="gap-1.5" onClick={handleDownloadTemplate}>
@@ -196,13 +194,13 @@ export default function ProductsPage() {
       {/* Excel format hint */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800">
         <p className="font-semibold mb-0.5">Format Excel import:</p>
-        <p>Cột A: Tên · B: Phân loại (Bếp/Quầy/Lễ tân) · C: Đơn vị (g/kg/ml/l/con/cái/phần) · D: Bao bì · E: Quy đổi</p>
+        <p>Cột A: Tên · B: Phân loại (Bếp/Quầy) · C: Đơn vị (g/kg/ml/l/con/cái/phần) · D: Bao bì · E: Quy đổi</p>
         <p className="mt-1">Nhấn <strong>Mẫu</strong> để tải file Excel mẫu</p>
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-2 flex-wrap">
-        {(["Tất cả", "Bếp", "Quầy", "Lễ tân"] as const).map((cat) => (
+      <div className="flex gap-2">
+        {(["Tất cả", "Bếp", "Quầy"] as const).map((cat) => (
           <button
             key={cat}
             onClick={() => setFilterCategory(cat)}
@@ -256,7 +254,7 @@ export default function ProductsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-semibold text-foreground truncate">{product.name}</span>
-                        <Badge variant={product.category === "Bếp" ? "bep" : product.category === "Quầy" ? "quay" : "letan"}>{product.category}</Badge>
+                        <Badge variant={product.category === "Bếp" ? "bep" : "quay"}>{product.category}</Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
                         Đơn vị: <strong>{product.unit}</strong>
