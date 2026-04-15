@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "manager" | "employee";
+export type UserRole = "admin" | "supervisor" | "manager" | "employee";
 export type UserCategory = "Bếp" | "Quầy" | "Lễ tân";
 
 export interface UserProfile {

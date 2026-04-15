@@ -22,9 +22,9 @@ type NavItem = { href: string; label: string; icon: React.ElementType; roles: st
 const ALL_NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin"] },
   { href: "/products", label: "Hàng hóa", icon: Package, roles: ["admin"] },
-  { href: "/inventory", label: "Tồn kho", icon: BarChart3, roles: ["admin", "manager", "employee"] },
+  { href: "/inventory", label: "Tồn kho", icon: BarChart3, roles: ["admin", "supervisor", "manager", "employee"] },
   { href: "/recipes", label: "Công thức", icon: BookOpen, roles: ["admin"] },
-  { href: "/reports", label: "Đối soát", icon: FileSpreadsheet, roles: ["manager"] },
+  { href: "/reports", label: "Đối soát", icon: FileSpreadsheet, roles: ["admin", "supervisor"] },
   { href: "/fabi", label: "Fabi", icon: FileSpreadsheet, roles: ["admin"] },
   { href: "/admin", label: "Tài khoản", icon: ShieldCheck, roles: ["admin"] },
 ];
@@ -54,6 +54,7 @@ export function Navbar() {
 
   const roleLabel =
     profile?.role === "admin" ? "Admin" :
+    profile?.role === "supervisor" ? "Giám sát" :
     profile?.role === "manager" ? "Quản lý" :
     profile?.category ? `NV ${profile.category}` : "Nhân viên";
 

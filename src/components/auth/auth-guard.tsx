@@ -21,19 +21,20 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     if (user && profile && pathname === "/login") {
       if (profile.role === "employee") router.replace("/inventory");
       else if (profile.role === "manager") router.replace("/inventory");
+      else if (profile.role === "supervisor") router.replace("/inventory");
       else router.replace("/");
       return;
     }
 
     if (!profile) return;
 
-    if (profile.role === "employee") {
-      // Employees can only access /inventory
+    if (profile.role === "employee" || profile.role === "manager") {
+      // Employees and managers can only access /inventory
       if (!pathname.startsWith("/inventory")) {
         router.replace("/inventory");
       }
-    } else if (profile.role === "manager") {
-      // Managers can only access /inventory and /reports
+    } else if (profile.role === "supervisor") {
+      // Supervisors can access /inventory and /reports
       const allowed = ["/inventory", "/reports"];
       if (!allowed.some((r) => pathname.startsWith(r))) {
         router.replace("/inventory");

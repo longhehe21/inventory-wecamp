@@ -24,7 +24,7 @@ export default function InventoryPage() {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const { toast, showToast, hideToast } = useToast();
 
-  // Determine category: employees are locked to their category
+  // Only employees are locked to their assigned category
   const isEmployee = profile?.role === "employee";
   const defaultCategory: WarehouseView = isEmployee && profile?.category
     ? (profile.category as WarehouseView)

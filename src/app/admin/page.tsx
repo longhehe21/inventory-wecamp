@@ -10,12 +10,14 @@ import { UserProfile, UserRole, UserCategory } from "@/types/auth";
 
 const ROLE_LABEL: Record<UserRole, string> = {
   admin: "Admin",
+  supervisor: "Giám sát",
   manager: "Quản lý",
   employee: "Nhân viên",
 };
 
 const ROLE_ICON: Record<UserRole, React.ReactNode> = {
   admin: <ShieldCheck className="h-4 w-4 text-red-500" />,
+  supervisor: <Users className="h-4 w-4 text-indigo-500" />,
   manager: <Users className="h-4 w-4 text-blue-500" />,
   employee: <User className="h-4 w-4 text-green-500" />,
 };
@@ -78,7 +80,7 @@ export default function AdminPage() {
         password: form.password,
         full_name: form.full_name.trim(),
         role: form.role,
-        category: form.role === "employee" ? form.category : null,
+        category: form.role === "employee" ? (form.category || "Bếp") : null,
       }),
     });
     const json = await res.json();
@@ -161,13 +163,13 @@ export default function AdminPage() {
               </div>
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Vai trò</label>
-                <div className="mt-1 flex gap-2">
-                  {(["admin", "manager", "employee"] as UserRole[]).map((r) => (
+                <div className="mt-1 grid grid-cols-2 gap-2">
+                  {(["admin", "supervisor", "manager", "employee"] as UserRole[]).map((r) => (
                     <button
                       key={r}
                       type="button"
                       onClick={() => setForm({ ...form, role: r, category: r === "employee" ? (form.category || "Bếp") : "" })}
-                      className={`flex-1 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                      className={`py-2 rounded-lg text-xs font-medium border transition-colors ${
                         form.role === r
                           ? "bg-primary text-primary-foreground border-primary"
                           : "bg-background text-muted-foreground border-input hover:border-ring"
@@ -177,6 +179,9 @@ export default function AdminPage() {
                     </button>
                   ))}
                 </div>
+                <p className="mt-1.5 text-[10px] text-muted-foreground">
+                  Giám sát: tồn kho + đối soát · Quản lý: tồn kho (cả 3 kho) + báo cáo tháng
+                </p>
               </div>
               {form.role === "employee" && (
                 <div>
