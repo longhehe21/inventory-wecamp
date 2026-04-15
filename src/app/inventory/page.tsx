@@ -90,13 +90,15 @@ export default function InventoryPage() {
         {/* Category filter — hidden for employees (locked) */}
         {isEmployee ? (
           <div className={`flex items-center justify-center py-2.5 rounded-xl text-sm font-semibold ${
-            category === "Bếp" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
+            category === "Bếp" ? "bg-orange-100 text-orange-700"
+            : category === "Quầy" ? "bg-blue-100 text-blue-700"
+            : "bg-purple-100 text-purple-700"
           }`}>
-            {category === "Bếp" ? "🍳 Khu vực Bếp" : "☕ Khu vực Quầy"}
+            {category === "Bếp" ? "🍳 Khu vực Bếp" : category === "Quầy" ? "☕ Khu vực Quầy" : "🛎️ Khu vực Lễ tân"}
           </div>
         ) : (
           <div className="flex gap-2">
-            {(["Bếp", "Quầy"] as ProductCategory[]).map((cat) => (
+            {(["Bếp", "Quầy", "Lễ tân"] as ProductCategory[]).map((cat) => (
               <button
                 key={cat}
                 onClick={() => setCategory(cat)}
@@ -104,11 +106,13 @@ export default function InventoryPage() {
                   category === cat
                     ? cat === "Bếp"
                       ? "bg-orange-500 text-white"
-                      : "bg-blue-500 text-white"
+                      : cat === "Quầy"
+                      ? "bg-blue-500 text-white"
+                      : "bg-purple-500 text-white"
                     : "bg-muted text-muted-foreground"
                 }`}
               >
-                {cat === "Bếp" ? "🍳 Bếp" : "☕ Quầy"}
+                {cat === "Bếp" ? "🍳 Bếp" : cat === "Quầy" ? "☕ Quầy" : "🛎️ Lễ tân"}
               </button>
             ))}
           </div>

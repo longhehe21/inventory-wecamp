@@ -1,4 +1,4 @@
-export type ProductCategory = "Bếp" | "Quầy";
+export type ProductCategory = "Bếp" | "Quầy" | "Lễ tân";
 export type ProductUnit = "g" | "kg" | "l" | "ml" | "con" | "cái" | "phần";
 export type PackageUnit = "túi" | "hộp" | "chai" | "gói" | "lon" | "thùng" | "cái" | "kg" | "lít";
 

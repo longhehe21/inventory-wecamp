@@ -29,6 +29,17 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Helper: product has packaging unit
+  const hasPkg = (p: Product) => !!p.package_unit && p.package_size > 0;
+  // Convert base units → display units (package or base)
+  const toDisplay = (baseVal: number, p: Product) =>
+    hasPkg(p) ? baseVal / p.package_size : baseVal;
+  // Convert display units → base units for saving
+  const toBase = (displayVal: number, p: Product) =>
+    hasPkg(p) ? displayVal * p.package_size : displayVal;
+  // Unit label shown to user
+  const displayUnit = (p: Product) => hasPkg(p) ? p.package_unit! : p.unit;
+
   const buildRows = useCallback(
     async (prods: Product[], selectedDate: string) => {
       if (!prods.length) return;
@@ -68,11 +79,15 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
         const today = todayMap[p.id];
         const prevClosing = prevMap[p.id] ?? 0;
         if (today) {
+          // Round to 4 decimal places to avoid floating point noise, keep as plain number string
+          const toInputStr = (val: number) => parseFloat(toDisplay(val, p).toFixed(4)).toString();
           return {
             product_id: p.id,
+            // opening_stock stored in base units
             opening_stock: today.opening_stock,
-            received: today.received.toString(),
-            closing_stock: today.closing_stock.toString(),
+            // received/closing in display units (package or base)
+            received: toInputStr(today.received),
+            closing_stock: toInputStr(today.closing_stock),
             existing_id: today.id,
           };
         }
@@ -88,6 +103,7 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
       setRows(newRows);
       setLoading(false);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
@@ -109,10 +125,15 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
     let errorCount = 0;
 
     for (const row of rows) {
-      const closing = parseFloat(row.closing_stock);
-      if (isNaN(closing) || row.closing_stock === "") continue; // skip empty rows
+      const closingDisplay = parseFloat(row.closing_stock);
+      if (isNaN(closingDisplay) || row.closing_stock === "") continue; // skip empty rows
 
-      const received = parseFloat(row.received) || 0;
+      const product = products.find((p) => p.id === row.product_id);
+      if (!product) continue;
+
+      // Convert display units → base units before saving
+      const closing = toBase(closingDisplay, product);
+      const received = toBase(parseFloat(row.received) || 0, product);
       const opening = row.opening_stock;
 
       const payload = {
@@ -148,10 +169,10 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
 
   // Tải file Excel mẫu với danh sách hàng hóa hiện tại
   const handleDownloadTemplate = () => {
-    const header = ["Tên hàng hóa", "Nhập hàng", "Tồn cuối"];
-    const dataRows = products.map((p) => [p.name, "", ""]);
+    const header = ["Tên hàng hóa", "Đơn vị nhập", "Nhập hàng", "Tồn cuối"];
+    const dataRows = products.map((p) => [p.name, displayUnit(p), "", ""]);
     const ws = XLSX.utils.aoa_to_sheet([header, ...dataRows]);
-    ws["!cols"] = [{ wch: 25 }, { wch: 12 }, { wch: 12 }];
+    ws["!cols"] = [{ wch: 25 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Tồn kho");
     XLSX.writeFile(wb, `ton-kho-${date}.xlsx`);
@@ -173,13 +194,20 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
           const next = [...prev];
           data.slice(1).forEach((row: string[]) => {
             const name = (row[0] || "").toString().trim().toLowerCase();
-            const received = parseFloat((row[1] || "0").toString()) || 0;
-            const closing = (row[2] || "").toString().trim();
+            // Col 1: Đơn vị nhập (bỏ qua), Col 2: Nhập hàng, Col 3: Tồn cuối
+            // Support both old format (col1=received, col2=closing) and new format (col1=unit, col2=received, col3=closing)
+            const hasUnitCol = isNaN(parseFloat((row[1] || "").toString()));
+            const receivedDisplay = parseFloat((hasUnitCol ? row[2] : row[1] || "0").toString()) || 0;
+            const closingDisplay = ((hasUnitCol ? row[3] : row[2]) || "").toString().trim();
             const idx = products.findIndex(
               (p) => p.name.toLowerCase() === name
             );
             if (idx !== -1) {
-              next[idx] = { ...next[idx], received: received.toString(), closing_stock: closing };
+              next[idx] = {
+                ...next[idx],
+                received: receivedDisplay.toString(),
+                closing_stock: closingDisplay,
+              };
               matched++;
             }
           });
@@ -194,10 +222,16 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
     e.target.value = "";
   };
 
-  const getActualUsed = (row: RowState) => {
-    const closing = parseFloat(row.closing_stock);
-    if (isNaN(closing)) return null;
-    return row.opening_stock + (parseFloat(row.received) || 0) - closing;
+  const getActualUsed = (row: RowState, product: Product) => {
+    const closingDisplay = parseFloat(row.closing_stock);
+    if (isNaN(closingDisplay)) return null;
+    const receivedDisplay = parseFloat(row.received) || 0;
+    if (hasPkg(product)) {
+      // All in display (package) units: convert opening from base first
+      const openingDisplay = toDisplay(row.opening_stock, product);
+      return openingDisplay + receivedDisplay - closingDisplay;
+    }
+    return row.opening_stock + receivedDisplay - closingDisplay;
   };
 
   if (loadingProducts) {
@@ -251,7 +285,14 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
           {rows.map((row, idx) => {
             const product = products.find((p) => p.id === row.product_id);
             if (!product) return null;
-            const actualUsed = getActualUsed(row);
+            const actualUsed = getActualUsed(row, product);
+            const usesPkg = hasPkg(product);
+            const unit = displayUnit(product);
+            const openingDisplay = usesPkg ? toDisplay(row.opening_stock, product) : row.opening_stock;
+
+            // Conversion hint: show base unit equivalent for closing stock
+            const closingVal = parseFloat(row.closing_stock);
+            const closingBase = usesPkg && !isNaN(closingVal) ? toBase(closingVal, product) : null;
 
             return (
               <div
@@ -260,8 +301,15 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
               >
                 {/* Product name row */}
                 <div className="flex items-center justify-between px-3 pt-3 pb-1">
-                  <span className="font-semibold text-sm text-foreground">{product.name}</span>
-                  <span className="text-xs text-muted-foreground">({product.unit})</span>
+                  <div>
+                    <span className="font-semibold text-sm text-foreground">{product.name}</span>
+                    {usesPkg && (
+                      <span className="text-[10px] text-blue-600 ml-1.5">
+                        1 {product.package_unit} = {formatNumber(product.package_size, 0)} {product.unit}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground">({unit})</span>
                 </div>
 
                 {/* Input grid */}
@@ -270,7 +318,7 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
                   <div>
                     <p className="text-[10px] text-muted-foreground mb-1">Tồn đầu</p>
                     <div className="h-10 bg-muted rounded-md flex items-center justify-center text-sm font-medium">
-                      {formatNumber(row.opening_stock, 1)}
+                      {formatNumber(openingDisplay, 2)}
                     </div>
                   </div>
 
@@ -303,10 +351,22 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
                   </div>
                 </div>
 
+                {/* Conversion hint for package products */}
+                {usesPkg && closingBase !== null && (
+                  <div className="px-3 pb-1 text-[10px] text-blue-600">
+                    = {formatNumber(closingBase, 1)} {product.unit}
+                  </div>
+                )}
+
                 {/* Actual used */}
                 {actualUsed !== null && (
                   <div className={`px-3 pb-2 text-xs font-medium ${actualUsed < 0 ? "text-red-600" : "text-green-700"}`}>
-                    Lượng dùng: {formatNumber(actualUsed, 1)} {product.unit}
+                    Lượng dùng: {formatNumber(actualUsed, 2)} {unit}
+                    {usesPkg && (
+                      <span className="text-muted-foreground font-normal ml-1">
+                        (= {formatNumber(toBase(actualUsed, product), 1)} {product.unit})
+                      </span>
+                    )}
                     {actualUsed < 0 && " ⚠️ âm - kiểm tra lại"}
                   </div>
                 )}
