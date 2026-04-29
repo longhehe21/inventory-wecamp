@@ -10,7 +10,6 @@ import { Product, ProductCategory } from "@/types/database";
 import { useAuth } from "@/contexts/auth-context";
 
 type Tab = "daily" | "monthly";
-type WarehouseView = ProductCategory | "Lễ tân";
 
 function getTodayStr() {
   return new Date().toISOString().split("T")[0];
@@ -26,15 +25,15 @@ export default function InventoryPage() {
 
   // Only employees are locked to their assigned category
   const isEmployee = profile?.role === "employee";
-  const defaultCategory: WarehouseView = isEmployee && profile?.category
-    ? (profile.category as WarehouseView)
+  const defaultCategory: ProductCategory = isEmployee && profile?.category
+    ? (profile.category as ProductCategory)
     : "Bếp";
-  const [category, setCategory] = useState<WarehouseView>(defaultCategory);
+  const [category, setCategory] = useState<ProductCategory>(defaultCategory);
 
   // Sync category when profile loads
   useEffect(() => {
     if (isEmployee && profile?.category) {
-      setCategory(profile.category as WarehouseView);
+      setCategory(profile.category as ProductCategory);
     }
   }, [isEmployee, profile?.category]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -57,10 +56,7 @@ export default function InventoryPage() {
     setDate(d.toISOString().split("T")[0]);
   };
 
-  // Lễ tân shows all products from both Bếp and Quầy
-  const filteredProducts = category === "Lễ tân"
-    ? products
-    : products.filter((p) => p.category === category);
+  const filteredProducts = products.filter((p) => p.category === category);
 
   return (
     <div className="space-y-0">
@@ -102,7 +98,7 @@ export default function InventoryPage() {
           </div>
         ) : (
           <div className="flex gap-2">
-            {(["Bếp", "Quầy", "Lễ tân"] as WarehouseView[]).map((cat) => (
+            {(["Bếp", "Quầy", "Lễ tân"] as ProductCategory[]).map((cat) => (
               <button
                 key={cat}
                 onClick={() => setCategory(cat)}

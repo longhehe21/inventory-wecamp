@@ -1,4 +1,4 @@
-export type ProductCategory = "Bếp" | "Quầy";
+export type ProductCategory = "Bếp" | "Quầy" | "Lễ tân";
 export type ProductUnit = string;
 export type PackageUnit = string;
 export type UnitType = "base" | "package";

@@ -25,7 +25,7 @@ ON CONFLICT (name, type) DO NOTHING;
 CREATE TABLE IF NOT EXISTS products (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
-  category TEXT NOT NULL CHECK (category IN ('Bếp', 'Quầy')),
+  category TEXT NOT NULL CHECK (category IN ('Bếp', 'Quầy', 'Lễ tân')),
   unit TEXT NOT NULL,
   package_unit TEXT,
   package_size NUMERIC NOT NULL DEFAULT 0,
