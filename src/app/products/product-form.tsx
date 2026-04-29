@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase";
-import { Product, ProductCategory, ProductUnit, PackageUnit } from "@/types/database";
+import { Product, ProductCategory, ProductUnit, PackageUnit, Unit, UnitType } from "@/types/database";
 
 interface ProductFormProps {
   product: Product | null;
@@ -28,45 +29,89 @@ interface ProductFormProps {
 
 const CATEGORIES: ProductCategory[] = ["Bếp", "Quầy"];
 
-const BASE_UNITS: { value: ProductUnit; label: string }[] = [
-  { value: "g",    label: "g (gram)" },
-  { value: "kg",   label: "kg (kilogram)" },
-  { value: "ml",   label: "ml (mililít)" },
-  { value: "l",    label: "l (lít)" },
-  { value: "con",  label: "con (con gà, con cá...)" },
-  { value: "cái",  label: "cái (cái trứng, cái...)" },
-  { value: "phần", label: "phần (phần ăn)" },
-];
-
-const PACKAGE_UNITS: { value: PackageUnit; label: string }[] = [
-  { value: "túi",   label: "Túi" },
-  { value: "hộp",   label: "Hộp" },
-  { value: "chai",  label: "Chai" },
-  { value: "gói",   label: "Gói" },
-  { value: "lon",   label: "Lon" },
-  { value: "thùng", label: "Thùng" },
-  { value: "cái",   label: "Cái" },
-  { value: "kg",    label: "Kg (cân ký)" },
-  { value: "lít",   label: "Lít (can lít)" },
-];
-
 export function ProductForm({ product, onClose, onSaved, onError }: ProductFormProps) {
   const [form, setForm] = useState({
     name: product?.name ?? "",
     category: (product?.category ?? "Bếp") as ProductCategory,
-    unit: (product?.unit ?? "g") as ProductUnit,
+    unit: (product?.unit ?? "") as ProductUnit,
     package_unit: (product?.package_unit ?? "") as PackageUnit | "",
     package_size: product?.package_size ? product.package_size.toString() : "",
   });
   const [saving, setSaving] = useState(false);
 
+  // Units fetched from DB
+  const [baseUnits, setBaseUnits] = useState<Unit[]>([]);
+  const [packageUnits, setPackageUnits] = useState<Unit[]>([]);
+
+  // Inline "add new unit" UI state
+  const [addingType, setAddingType] = useState<UnitType | null>(null);
+  const [newUnitName, setNewUnitName] = useState("");
+  const [savingUnit, setSavingUnit] = useState(false);
+
   const isEdit = !!product;
   const hasPackage = !!form.package_unit;
+
+  // Load units on mount
+  useEffect(() => {
+    const fetchUnits = async () => {
+      const { data, error } = await supabase
+        .from("units")
+        .select("*")
+        .order("name");
+      if (error) {
+        onError("Lỗi tải đơn vị: " + error.message);
+        return;
+      }
+      const units = (data as Unit[]) || [];
+      setBaseUnits(units.filter((u) => u.type === "base"));
+      setPackageUnits(units.filter((u) => u.type === "package"));
+      // Set default base unit if not editing
+      if (!product && units.length > 0) {
+        const firstBase = units.find((u) => u.type === "base");
+        if (firstBase) setForm((f) => (f.unit ? f : { ...f, unit: firstBase.name }));
+      }
+    };
+    fetchUnits();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleAddUnit = async (type: UnitType) => {
+    const name = newUnitName.trim();
+    if (!name) {
+      onError("Vui lòng nhập tên đơn vị");
+      return;
+    }
+    setSavingUnit(true);
+    const { data, error } = await supabase
+      .from("units")
+      .insert({ name, type })
+      .select()
+      .single();
+    setSavingUnit(false);
+    if (error) {
+      onError("Lỗi thêm đơn vị: " + error.message);
+      return;
+    }
+    const newUnit = data as Unit;
+    if (type === "base") {
+      setBaseUnits((prev) => [...prev, newUnit].sort((a, b) => a.name.localeCompare(b.name)));
+      setForm((f) => ({ ...f, unit: newUnit.name }));
+    } else {
+      setPackageUnits((prev) => [...prev, newUnit].sort((a, b) => a.name.localeCompare(b.name)));
+      setForm((f) => ({ ...f, package_unit: newUnit.name }));
+    }
+    setNewUnitName("");
+    setAddingType(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) {
       onError("Vui lòng nhập tên hàng hóa");
+      return;
+    }
+    if (!form.unit) {
+      onError("Vui lòng chọn đơn vị tính cơ bản");
       return;
     }
     if (hasPackage && (!form.package_size || parseFloat(form.package_size) <= 0)) {
@@ -138,17 +183,58 @@ export function ProductForm({ product, onClose, onSaved, onError }: ProductFormP
           {/* Đơn vị cơ bản */}
           <div className="space-y-1.5">
             <Label>Đơn vị tính cơ bản</Label>
-            <Select
-              value={form.unit}
-              onValueChange={(v) => setForm((f) => ({ ...f, unit: v as ProductUnit }))}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {BASE_UNITS.map(({ value, label }) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <Select
+                value={form.unit}
+                onValueChange={(v) => setForm((f) => ({ ...f, unit: v as ProductUnit }))}
+              >
+                <SelectTrigger className="flex-1"><SelectValue placeholder="Chọn đơn vị..." /></SelectTrigger>
+                <SelectContent>
+                  {baseUnits.map((u) => (
+                    <SelectItem key={u.id} value={u.name}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 shrink-0"
+                title="Thêm đơn vị mới"
+                onClick={() => { setAddingType("base"); setNewUnitName(""); }}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            {addingType === "base" && (
+              <div className="flex gap-2 mt-2 p-2 bg-muted rounded-md">
+                <Input
+                  placeholder="VD: thìa, lát, miếng..."
+                  value={newUnitName}
+                  onChange={(e) => setNewUnitName(e.target.value)}
+                  className="flex-1 h-9"
+                  autoFocus
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-9"
+                  onClick={() => handleAddUnit("base")}
+                  disabled={savingUnit}
+                >
+                  {savingUnit ? "..." : "Thêm"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  onClick={() => { setAddingType(null); setNewUnitName(""); }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
               Đơn vị dùng để nhập tồn kho và tính định mức
             </p>
@@ -163,26 +249,67 @@ export function ProductForm({ product, onClose, onSaved, onError }: ProductFormP
             {/* Đơn vị bao bì */}
             <div className="space-y-1.5">
               <Label>Đơn vị bao bì</Label>
-              <Select
-                value={form.package_unit || "none"}
-                onValueChange={(v) =>
-                  setForm((f) => ({
-                    ...f,
-                    package_unit: v === "none" ? "" : v as PackageUnit,
-                    package_size: v === "none" ? "" : f.package_size,
-                  }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Chọn loại bao bì..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">— Không có bao bì —</SelectItem>
-                  {PACKAGE_UNITS.map(({ value, label }) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select
+                  value={form.package_unit || "none"}
+                  onValueChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      package_unit: v === "none" ? "" : v as PackageUnit,
+                      package_size: v === "none" ? "" : f.package_size,
+                    }))
+                  }
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Chọn loại bao bì..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Không có bao bì —</SelectItem>
+                    {packageUnits.map((u) => (
+                      <SelectItem key={u.id} value={u.name}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 shrink-0"
+                  title="Thêm đơn vị bao bì mới"
+                  onClick={() => { setAddingType("package"); setNewUnitName(""); }}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              {addingType === "package" && (
+                <div className="flex gap-2 mt-2 p-2 bg-muted rounded-md">
+                  <Input
+                    placeholder="VD: vỉ, khay, két..."
+                    value={newUnitName}
+                    onChange={(e) => setNewUnitName(e.target.value)}
+                    className="flex-1 h-9"
+                    autoFocus
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-9"
+                    onClick={() => handleAddUnit("package")}
+                    disabled={savingUnit}
+                  >
+                    {savingUnit ? "..." : "Thêm"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
+                    onClick={() => { setAddingType(null); setNewUnitName(""); }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Quy đổi — chỉ hiện khi đã chọn bao bì */}

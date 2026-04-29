@@ -12,9 +12,7 @@ import { Product, ProductCategory, ProductUnit, PackageUnit } from "@/types/data
 import { formatNumber } from "@/lib/utils";
 import * as XLSX from "xlsx";
 
-const VALID_UNITS: ProductUnit[] = ["g", "kg", "l", "ml", "con", "cái", "phần"];
 const VALID_CATEGORIES: ProductCategory[] = ["Bếp", "Quầy"];
-const VALID_PACKAGE_UNITS: PackageUnit[] = ["túi", "hộp", "chai", "gói", "lon", "thùng", "cái", "kg", "lít"];
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -102,11 +100,11 @@ export default function ProductsPage() {
             errors.push(`Dòng ${i + 1}: Phân loại "${category}" không hợp lệ (Bếp/Quầy)`);
             continue;
           }
-          if (!VALID_UNITS.includes(unit)) {
-            errors.push(`Dòng ${i + 1}: Đơn vị "${unit}" không hợp lệ`);
+          if (!unit) {
+            errors.push(`Dòng ${i + 1}: Chưa có đơn vị tính`);
             continue;
           }
-          const hasPkg = packageUnit && VALID_PACKAGE_UNITS.includes(packageUnit);
+          const hasPkg = !!packageUnit;
 
           toInsert.push({
             name,
@@ -194,7 +192,7 @@ export default function ProductsPage() {
       {/* Excel format hint */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800">
         <p className="font-semibold mb-0.5">Format Excel import:</p>
-        <p>Cột A: Tên · B: Phân loại (Bếp/Quầy) · C: Đơn vị (g/kg/ml/l/con/cái/phần) · D: Bao bì · E: Quy đổi</p>
+        <p>Cột A: Tên · B: Phân loại (Bếp/Quầy) · C: Đơn vị · D: Bao bì · E: Quy đổi</p>
         <p className="mt-1">Nhấn <strong>Mẫu</strong> để tải file Excel mẫu</p>
       </div>
 

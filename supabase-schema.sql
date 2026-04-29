@@ -3,13 +3,31 @@
 -- Chạy SQL này trong Supabase SQL Editor
 -- ============================================================
 
--- 1. Bảng Hàng hóa (Products)
+-- 1. Bảng Đơn vị (Units) - cho phép tự thêm
+CREATE TABLE IF NOT EXISTS units (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('base', 'package')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (name, type)
+);
+
+-- Pre-populate units mặc định
+INSERT INTO units (name, type) VALUES
+  ('g', 'base'), ('kg', 'base'), ('l', 'base'), ('ml', 'base'),
+  ('con', 'base'), ('cái', 'base'), ('phần', 'base'),
+  ('túi', 'package'), ('hộp', 'package'), ('chai', 'package'),
+  ('gói', 'package'), ('lon', 'package'), ('thùng', 'package'),
+  ('cái', 'package'), ('kg', 'package'), ('lít', 'package')
+ON CONFLICT (name, type) DO NOTHING;
+
+-- 2. Bảng Hàng hóa (Products) - đơn vị giờ là TEXT tự do
 CREATE TABLE IF NOT EXISTS products (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   category TEXT NOT NULL CHECK (category IN ('Bếp', 'Quầy')),
-  unit TEXT NOT NULL CHECK (unit IN ('g', 'kg', 'l', 'ml')),
-  package_unit TEXT CHECK (package_unit IN ('túi', 'hộp', 'chai', 'gói', 'lon', 'thùng', 'cái', 'kg', 'lít')),
+  unit TEXT NOT NULL,
+  package_unit TEXT,
   package_size NUMERIC NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -78,12 +96,14 @@ ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory_daily ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recipes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fabi_sales ENABLE ROW LEVEL SECURITY;
+ALTER TABLE units ENABLE ROW LEVEL SECURITY;
 
 -- Cho phép đọc/ghi public (điều chỉnh sau khi thêm auth)
 CREATE POLICY "Allow all for now" ON products FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all for now" ON inventory_daily FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all for now" ON recipes FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all for now" ON fabi_sales FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all for now" ON units FOR ALL USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- Indexes

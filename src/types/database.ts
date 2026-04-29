@@ -1,6 +1,14 @@
 export type ProductCategory = "Bếp" | "Quầy";
-export type ProductUnit = "g" | "kg" | "l" | "ml" | "con" | "cái" | "phần";
-export type PackageUnit = "túi" | "hộp" | "chai" | "gói" | "lon" | "thùng" | "cái" | "kg" | "lít";
+export type ProductUnit = string;
+export type PackageUnit = string;
+export type UnitType = "base" | "package";
+
+export interface Unit {
+  id: string;
+  name: string;
+  type: UnitType;
+  created_at: string;
+}
 
 export interface Product {
   id: string;
@@ -69,6 +77,11 @@ export interface Database {
         Row: FabiSale;
         Insert: Omit<FabiSale, "id" | "created_at">;
         Update: Partial<Omit<FabiSale, "id" | "created_at">>;
+      };
+      units: {
+        Row: Unit;
+        Insert: Omit<Unit, "id" | "created_at">;
+        Update: Partial<Omit<Unit, "id" | "created_at">>;
       };
     };
   };
