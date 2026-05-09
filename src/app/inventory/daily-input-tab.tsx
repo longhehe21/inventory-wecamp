@@ -192,64 +192,55 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
         }
         const data: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
-        // ──────────── DEBUG LOGS ────────────
-        console.group("[Excel Import] Debug");
-        console.log("Sheet name:", wb.SheetNames[0]);
-        console.log("Total rows in file:", data.length);
-        console.log("Header row:", data[0]);
-        console.log("First 3 data rows:", data.slice(1, 4));
-        console.log("Products in current view:", products.length);
-        console.log("Product names in DB:",
-          products.map((p) => ({ name: p.name, normalized: p.name.normalize("NFC").trim().toLowerCase().replace(/\s+/g, " ") }))
-        );
-        // ────────────────────────────────────
-
         const safe = (v: unknown) => (v === undefined || v === null ? "" : String(v));
         // Normalize unicode + lowercase + strip extra whitespace for robust matching
         const norm = (s: string) =>
           s.normalize("NFC").trim().toLowerCase().replace(/\s+/g, " ");
 
-        let matched = 0;
-        let totalRows = 0;
+        // Compute all updates synchronously BEFORE calling setRows.
+        // (Mutating counters inside a setState updater is unreliable — the updater
+        //  may run async/twice in React 18 strict mode, so the counts read after
+        //  setRows would be wrong.)
+        const toNumStr = (s: string) => s.trim().replace(",", ".");
+        const updates: { idx: number; received: string; closing: string }[] = [];
         const unmatched: string[] = [];
+        let totalRows = 0;
 
+        data.slice(1).forEach((row) => {
+          if (!row || !row.length) return;
+          const rawName = safe(row[0]).trim();
+          if (!rawName) return;
+          totalRows++;
+          const name = norm(rawName);
+
+          // Support old (3 cols: name|received|closing) and new (4 cols: name|unit|received|closing)
+          const col1 = safe(row[1]).trim();
+          const hasUnitCol = col1 !== "" && isNaN(parseFloat(toNumStr(col1)));
+          const receivedRaw = hasUnitCol ? safe(row[2]) : safe(row[1]);
+          const closingRaw = hasUnitCol ? safe(row[3]) : safe(row[2]);
+
+          const received = parseFloat(toNumStr(receivedRaw)) || 0;
+          const closingNum = parseFloat(toNumStr(closingRaw));
+          const closing = isNaN(closingNum) ? "" : closingNum.toString();
+
+          const idx = products.findIndex((p) => norm(p.name) === name);
+          if (idx !== -1) {
+            updates.push({ idx, received: received.toString(), closing });
+          } else {
+            unmatched.push(rawName);
+          }
+        });
+
+        const matched = updates.length;
+
+        // Apply all updates in a single setRows call
         setRows((prev) => {
           const next = [...prev];
-          data.slice(1).forEach((row) => {
-            if (!row || !row.length) return;
-            const rawName = safe(row[0]).trim();
-            if (!rawName) return;
-            totalRows++;
-            const name = norm(rawName);
-
-            // Support old (3 cols: name|received|closing) and new (4 cols: name|unit|received|closing)
-            // Replace Vietnamese decimal comma with dot ("4,1" → "4.1") for parseFloat / number input
-            const toNumStr = (s: string) => s.trim().replace(",", ".");
-            const col1 = safe(row[1]).trim();
-            const hasUnitCol = col1 !== "" && isNaN(parseFloat(toNumStr(col1)));
-            const receivedRaw = hasUnitCol ? safe(row[2]) : safe(row[1]);
-            const closingRaw = hasUnitCol ? safe(row[3]) : safe(row[2]);
-
-            const received = parseFloat(toNumStr(receivedRaw)) || 0;
-            const closingNum = parseFloat(toNumStr(closingRaw));
-            const closing = isNaN(closingNum) ? "" : closingNum.toString();
-
-            const idx = products.findIndex((p) => norm(p.name) === name);
-            console.log(
-              `[Row] raw="${rawName}" | normalized="${name}" | hasUnitCol=${hasUnitCol} | received=${received} | closing="${closing}" | matched=${idx !== -1}`
-            );
-            if (idx !== -1) {
-              next[idx] = { ...next[idx], received: received.toString(), closing_stock: closing };
-              matched++;
-            } else {
-              unmatched.push(rawName);
-            }
+          updates.forEach(({ idx, received, closing }) => {
+            next[idx] = { ...next[idx], received, closing_stock: closing };
           });
           return next;
         });
-
-        console.log(`[Result] matched=${matched}, totalRows=${totalRows}, unmatched=`, unmatched);
-        console.groupEnd();
 
         if (matched === 0 && totalRows > 0) {
           const sample = unmatched.slice(0, 3).join(", ");
