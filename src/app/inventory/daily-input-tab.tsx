@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Save, Upload, RefreshCw, Package, Download } from "lucide-react";
+import { Save, Upload, RefreshCw, Package, Download, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { Product, InventoryDaily } from "@/types/database";
@@ -27,6 +27,8 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
   const [rows, setRows] = useState<RowState[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmingClear, setConfirmingClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Only Lễ tân uses package units; Bếp/Quầy uses base units
@@ -165,6 +167,36 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
     buildRows(products, date);
   };
 
+  // Xóa tất cả nhập hàng + tồn cuối của ngày hiện tại (cho hàng hóa đang xem)
+  const handleClearAll = async () => {
+    setClearing(true);
+    const productIds = products.map((p) => p.id);
+    const { error } = await supabase
+      .from("inventory_daily")
+      .delete()
+      .eq("date", date)
+      .in("product_id", productIds);
+
+    setClearing(false);
+    setConfirmingClear(false);
+
+    if (error) {
+      onError("Lỗi xóa: " + error.message);
+      return;
+    }
+
+    // Reset state: keep opening_stock (from yesterday), clear received/closing
+    setRows((prev) =>
+      prev.map((r) => ({
+        ...r,
+        received: "0",
+        closing_stock: "",
+        existing_id: undefined,
+      }))
+    );
+    onSuccess(`Đã xóa nhập hàng + tồn cuối ngày ${date.split("-").reverse().join("/")}`);
+  };
+
   // Tải file Excel mẫu với danh sách hàng hóa hiện tại
   const handleDownloadTemplate = () => {
     const header = ["Tên hàng hóa", "Đơn vị nhập", "Nhập hàng", "Tồn cuối"];
@@ -293,7 +325,7 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
   return (
     <div className="space-y-3">
       {/* Action buttons */}
-      <div className="px-4 flex gap-2">
+      <div className="px-4 flex gap-2 flex-wrap">
         <Button variant="outline" size="sm" className="gap-1.5" onClick={handleDownloadTemplate}>
           <Download className="h-4 w-4" />
           Mẫu
@@ -307,11 +339,41 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           Làm mới
         </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+          onClick={() => setConfirmingClear(true)}
+          disabled={clearing}
+        >
+          <Trash2 className="h-4 w-4" />
+          Xóa tất cả
+        </Button>
         <Button size="sm" className="gap-1.5 ml-auto" onClick={handleSaveAll} disabled={saving}>
           <Save className="h-4 w-4" />
           {saving ? "Đang lưu..." : "Lưu"}
         </Button>
       </div>
+
+      {/* Confirmation banner for "Xóa tất cả" */}
+      {confirmingClear && (
+        <div className="mx-4 p-3 bg-red-50 border border-red-200 rounded-xl">
+          <p className="text-sm font-medium text-red-800 mb-1">
+            Xóa tất cả Nhập hàng và Tồn cuối ngày {date.split("-").reverse().join("/")}?
+          </p>
+          <p className="text-xs text-red-600 mb-3">
+            Sẽ xóa {products.length} hàng hóa của kho hiện tại. Tồn đầu (từ hôm qua) vẫn giữ lại. Hành động không thể hoàn tác.
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" variant="destructive" className="flex-1" onClick={handleClearAll} disabled={clearing}>
+              {clearing ? "Đang xóa..." : "Xóa hết"}
+            </Button>
+            <Button size="sm" variant="outline" className="flex-1" onClick={() => setConfirmingClear(false)} disabled={clearing}>
+              Hủy
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Inventory table */}
       {loading ? (
