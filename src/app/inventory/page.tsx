@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Toast, useToast } from "@/components/ui/toast";
@@ -56,7 +56,12 @@ export default function InventoryPage() {
     setDate(d.toISOString().split("T")[0]);
   };
 
-  const filteredProducts = products.filter((p) => p.category === category);
+  // Memoize so children's useEffect deps don't fire on every parent re-render
+  // (e.g. toast state change would otherwise produce a new array ref every time)
+  const filteredProducts = useMemo(
+    () => products.filter((p) => p.category === category),
+    [products, category]
+  );
 
   return (
     <div className="space-y-0">
