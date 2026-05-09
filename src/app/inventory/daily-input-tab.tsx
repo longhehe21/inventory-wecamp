@@ -174,29 +174,42 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
     XLSX.writeFile(wb, `ton-kho-${date}.xlsx`);
   };
 
-  // Excel import: expect columns: Tên hàng hóa | Đơn vị | Nhập hàng | Tồn cuối
+  // Excel import: expect columns: Tên hàng hóa | Đơn vị nhập | Nhập hàng | Tồn cuối
   const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        const wb = XLSX.read(ev.target?.result, { type: "binary" });
+        const buffer = ev.target?.result as ArrayBuffer;
+        const wb = XLSX.read(buffer, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const data: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        if (!ws) {
+          onError("File Excel không có dữ liệu");
+          return;
+        }
+        const data: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+        const safe = (v: unknown) => (v === undefined || v === null ? "" : String(v));
 
         let matched = 0;
         setRows((prev) => {
           const next = [...prev];
-          data.slice(1).forEach((row: string[]) => {
-            const name = (row[0] || "").toString().trim().toLowerCase();
-            // Support old (3 cols) and new (4 cols with Đơn vị) formats
-            const hasUnitCol = isNaN(parseFloat((row[1] || "").toString()));
-            const received = parseFloat((hasUnitCol ? row[2] : row[1] || "0").toString()) || 0;
-            const closing = ((hasUnitCol ? row[3] : row[2]) || "").toString().trim();
-            const idx = products.findIndex(
-              (p) => p.name.toLowerCase() === name
-            );
+          data.slice(1).forEach((row) => {
+            if (!row || !row.length) return;
+            const name = safe(row[0]).trim().toLowerCase();
+            if (!name) return;
+
+            // Support old (3 cols: name|received|closing) and new (4 cols: name|unit|received|closing)
+            const col1 = safe(row[1]).trim();
+            const hasUnitCol = col1 !== "" && isNaN(parseFloat(col1));
+            const receivedRaw = hasUnitCol ? safe(row[2]) : safe(row[1]);
+            const closingRaw = hasUnitCol ? safe(row[3]) : safe(row[2]);
+
+            const received = parseFloat(receivedRaw) || 0;
+            const closing = closingRaw.trim();
+
+            const idx = products.findIndex((p) => p.name.toLowerCase() === name);
             if (idx !== -1) {
               next[idx] = { ...next[idx], received: received.toString(), closing_stock: closing };
               matched++;
@@ -205,11 +218,12 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
           return next;
         });
         onSuccess(`Đã nhập ${matched} hàng hóa từ Excel`);
-      } catch {
-        onError("Lỗi đọc file Excel. Kiểm tra định dạng file.");
+      } catch (err) {
+        onError("Lỗi đọc file Excel: " + (err instanceof Error ? err.message : "định dạng không hợp lệ"));
       }
     };
-    reader.readAsBinaryString(file);
+    reader.onerror = () => onError("Không đọc được file Excel");
+    reader.readAsArrayBuffer(file);
     e.target.value = "";
   };
 
