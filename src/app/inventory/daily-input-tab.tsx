@@ -192,6 +192,18 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
         }
         const data: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
+        // ──────────── DEBUG LOGS ────────────
+        console.group("[Excel Import] Debug");
+        console.log("Sheet name:", wb.SheetNames[0]);
+        console.log("Total rows in file:", data.length);
+        console.log("Header row:", data[0]);
+        console.log("First 3 data rows:", data.slice(1, 4));
+        console.log("Products in current view:", products.length);
+        console.log("Product names in DB:",
+          products.map((p) => ({ name: p.name, normalized: p.name.normalize("NFC").trim().toLowerCase().replace(/\s+/g, " ") }))
+        );
+        // ────────────────────────────────────
+
         const safe = (v: unknown) => (v === undefined || v === null ? "" : String(v));
         // Normalize unicode + lowercase + strip extra whitespace for robust matching
         const norm = (s: string) =>
@@ -223,6 +235,9 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
             const closing = isNaN(closingNum) ? "" : closingNum.toString();
 
             const idx = products.findIndex((p) => norm(p.name) === name);
+            console.log(
+              `[Row] raw="${rawName}" | normalized="${name}" | hasUnitCol=${hasUnitCol} | received=${received} | closing="${closing}" | matched=${idx !== -1}`
+            );
             if (idx !== -1) {
               next[idx] = { ...next[idx], received: received.toString(), closing_stock: closing };
               matched++;
@@ -232,6 +247,9 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
           });
           return next;
         });
+
+        console.log(`[Result] matched=${matched}, totalRows=${totalRows}, unmatched=`, unmatched);
+        console.groupEnd();
 
         if (matched === 0 && totalRows > 0) {
           const sample = unmatched.slice(0, 3).join(", ");
