@@ -108,9 +108,11 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
   }, [products, date, buildRows]);
 
   const updateRow = (idx: number, field: "received" | "closing_stock", val: string) => {
+    // Convert any comma decimal separator to dot (Vietnamese keyboards often produce "4,1")
+    const normalized = val.replace(",", ".");
     setRows((prev) => {
       const next = [...prev];
-      next[idx] = { ...next[idx], [field]: val };
+      next[idx] = { ...next[idx], [field]: normalized };
       return next;
     });
   };
@@ -191,33 +193,58 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
         const data: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
         const safe = (v: unknown) => (v === undefined || v === null ? "" : String(v));
+        // Normalize unicode + lowercase + strip extra whitespace for robust matching
+        const norm = (s: string) =>
+          s.normalize("NFC").trim().toLowerCase().replace(/\s+/g, " ");
 
         let matched = 0;
+        let totalRows = 0;
+        const unmatched: string[] = [];
+
         setRows((prev) => {
           const next = [...prev];
           data.slice(1).forEach((row) => {
             if (!row || !row.length) return;
-            const name = safe(row[0]).trim().toLowerCase();
-            if (!name) return;
+            const rawName = safe(row[0]).trim();
+            if (!rawName) return;
+            totalRows++;
+            const name = norm(rawName);
 
             // Support old (3 cols: name|received|closing) and new (4 cols: name|unit|received|closing)
+            // Replace Vietnamese decimal comma with dot ("4,1" → "4.1") for parseFloat / number input
+            const toNumStr = (s: string) => s.trim().replace(",", ".");
             const col1 = safe(row[1]).trim();
-            const hasUnitCol = col1 !== "" && isNaN(parseFloat(col1));
+            const hasUnitCol = col1 !== "" && isNaN(parseFloat(toNumStr(col1)));
             const receivedRaw = hasUnitCol ? safe(row[2]) : safe(row[1]);
             const closingRaw = hasUnitCol ? safe(row[3]) : safe(row[2]);
 
-            const received = parseFloat(receivedRaw) || 0;
-            const closing = closingRaw.trim();
+            const received = parseFloat(toNumStr(receivedRaw)) || 0;
+            const closingNum = parseFloat(toNumStr(closingRaw));
+            const closing = isNaN(closingNum) ? "" : closingNum.toString();
 
-            const idx = products.findIndex((p) => p.name.toLowerCase() === name);
+            const idx = products.findIndex((p) => norm(p.name) === name);
             if (idx !== -1) {
               next[idx] = { ...next[idx], received: received.toString(), closing_stock: closing };
               matched++;
+            } else {
+              unmatched.push(rawName);
             }
           });
           return next;
         });
-        onSuccess(`Đã nhập ${matched} hàng hóa từ Excel`);
+
+        if (matched === 0 && totalRows > 0) {
+          const sample = unmatched.slice(0, 3).join(", ");
+          onError(
+            `Không khớp được hàng hóa nào (${totalRows} dòng). ` +
+            `Kiểm tra kho đang chọn (${products.length > 0 ? products[0].category : "?"}) ` +
+            `có chứa các tên: ${sample}${unmatched.length > 3 ? "..." : ""}`
+          );
+        } else if (matched < totalRows) {
+          onSuccess(`Đã nhập ${matched}/${totalRows} hàng hóa (${totalRows - matched} không khớp tên)`);
+        } else {
+          onSuccess(`Đã nhập ${matched} hàng hóa từ Excel`);
+        }
       } catch (err) {
         onError("Lỗi đọc file Excel: " + (err instanceof Error ? err.message : "định dạng không hợp lệ"));
       }
