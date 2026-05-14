@@ -1,5 +1,5 @@
 export type UserRole = "admin" | "supervisor" | "manager" | "employee";
-export type UserCategory = "Bếp" | "Quầy" | "Lễ tân";
+export type UserCategory = "Bếp" | "Quầy";
 
 export interface UserProfile {
   id: string;

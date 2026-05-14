@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   email TEXT NOT NULL,
   full_name TEXT NOT NULL DEFAULT '',
   role TEXT NOT NULL CHECK (role IN ('admin', 'supervisor', 'manager', 'employee')),
-  category TEXT CHECK (category IN ('Bếp', 'Quầy', 'Lễ tân')), -- chỉ dành cho nhân viên
+  category TEXT CHECK (category IN ('Bếp', 'Quầy')), -- chỉ dành cho nhân viên
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

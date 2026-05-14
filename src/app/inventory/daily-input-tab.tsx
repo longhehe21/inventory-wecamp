@@ -31,10 +31,9 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
   const [clearing, setClearing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Bếp & Lễ tân use package units (hộp, túi...); Quầy uses base units (g, ml...)
+  // Bếp uses package units (hộp, túi...) when configured; Quầy uses base units
   const usesPackageInput = (p: Product) =>
-    (p.category === "Bếp" || p.category === "Lễ tân") &&
-    !!p.package_unit && p.package_size > 0;
+    p.category === "Bếp" && !!p.package_unit && p.package_size > 0;
   const inputUnit = (p: Product) =>
     usesPackageInput(p) ? p.package_unit! : p.unit;
   const toDisplay = (baseVal: number, p: Product) =>
