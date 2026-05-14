@@ -1,10 +1,11 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
-import { Product, InventoryDaily } from "@/types/database";
+import { Product, InventoryDaily, ProductCategory } from "@/types/database";
 import { formatNumber } from "@/lib/utils";
+import * as XLSX from "xlsx";
 
 interface Props {
   products: Product[];
@@ -98,6 +99,111 @@ export function MonthlyReportTab({ products, onError }: Props) {
     reportRows.some((r) => r.days[d] !== undefined)
   );
 
+  // Build a worksheet (full month grid) for a given set of products + records
+  const buildMonthSheet = (prods: Product[], recs: InventoryDaily[]) => {
+    const productRows: ReportRow[] = prods.map((product) => {
+      const dayMap: ReportRow["days"] = {};
+      let totalUsed = 0;
+      let totalReceived = 0;
+      recs.filter((r) => r.product_id === product.id).forEach((r) => {
+        dayMap[r.date] = {
+          opening: r.opening_stock,
+          received: r.received,
+          closing: r.closing_stock,
+          used: r.actual_used,
+        };
+        totalUsed += r.actual_used;
+        totalReceived += r.received;
+      });
+      return { product, days: dayMap, totalUsed, totalReceived };
+    });
+
+    const monthDays = getDaysInMonth(year, month);
+    const usedDays = monthDays.filter((d) => productRows.some((r) => r.days[d] !== undefined));
+
+    const header = [
+      "Hàng hóa",
+      "Đơn vị",
+      ...usedDays.map((d) => `${d.split("-")[2]}/${d.split("-")[1]}`),
+      "Tổng nhập",
+      "Tổng dùng",
+    ];
+    const dataRows = productRows.map((row) => [
+      row.product.name,
+      row.product.unit,
+      ...usedDays.map((d) => {
+        const cell = row.days[d];
+        return cell ? Number(cell.used.toFixed(4)) : "";
+      }),
+      Number(row.totalReceived.toFixed(4)),
+      Number(row.totalUsed.toFixed(4)),
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet([header, ...dataRows]);
+    ws["!cols"] = [
+      { wch: 25 }, { wch: 10 },
+      ...usedDays.map(() => ({ wch: 8 })),
+      { wch: 12 }, { wch: 12 },
+    ];
+    return ws;
+  };
+
+  // Export current category only
+  const handleExportCurrent = () => {
+    if (!products.length) {
+      onError("Chưa có hàng hóa để xuất");
+      return;
+    }
+    const category = products[0].category;
+    const ws = buildMonthSheet(products, records);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `${category}`);
+    XLSX.writeFile(wb, `bao-cao-${category}-${getMonthStr(year, month)}.xlsx`);
+  };
+
+  // Export both warehouses in one workbook (2 sheets)
+  const handleExportAll = async () => {
+    const monthStr = getMonthStr(year, month);
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const lastDayStr = `${monthStr}-${String(lastDay).padStart(2, "0")}`;
+
+    const { data: allProductsData, error: pErr } = await supabase
+      .from("products")
+      .select("*")
+      .order("name");
+    if (pErr) {
+      onError("Lỗi tải hàng hóa: " + pErr.message);
+      return;
+    }
+    const allProducts = (allProductsData as Product[]) || [];
+
+    const { data: allRecords, error: rErr } = await supabase
+      .from("inventory_daily")
+      .select("*")
+      .gte("date", `${monthStr}-01`)
+      .lte("date", lastDayStr)
+      .in("product_id", allProducts.map((p) => p.id));
+    if (rErr) {
+      onError("Lỗi tải báo cáo: " + rErr.message);
+      return;
+    }
+    const recs = (allRecords as InventoryDaily[]) || [];
+
+    const wb = XLSX.utils.book_new();
+    (["Bếp", "Quầy"] as ProductCategory[]).forEach((cat) => {
+      const prods = allProducts.filter((p) => p.category === cat);
+      if (!prods.length) return;
+      const ws = buildMonthSheet(prods, recs);
+      XLSX.utils.book_append_sheet(wb, ws, cat);
+    });
+
+    if (wb.SheetNames.length === 0) {
+      onError("Không có dữ liệu để xuất");
+      return;
+    }
+    XLSX.writeFile(wb, `bao-cao-tat-ca-${monthStr}.xlsx`);
+  };
+
   return (
     <div className="space-y-3 px-4">
       {/* Month navigator */}
@@ -114,6 +220,30 @@ export function MonthlyReportTab({ products, onError }: Props) {
           disabled={year === today.getFullYear() && month >= today.getMonth()}
         >
           <ChevronRight className="h-5 w-5" />
+        </Button>
+      </div>
+
+      {/* Export buttons */}
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1 gap-1.5 text-green-700 border-green-200 hover:bg-green-50"
+          onClick={handleExportCurrent}
+          disabled={loading || products.length === 0}
+        >
+          <FileDown className="h-4 w-4" />
+          Xuất kho hiện tại
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1 gap-1.5 text-green-700 border-green-200 hover:bg-green-50"
+          onClick={handleExportAll}
+          disabled={loading}
+        >
+          <FileDown className="h-4 w-4" />
+          Xuất cả 2 kho
         </Button>
       </div>
 

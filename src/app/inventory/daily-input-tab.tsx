@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Save, Upload, RefreshCw, Package, Download, Trash2 } from "lucide-react";
+import { Save, Upload, RefreshCw, Package, Download, Trash2, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { Product, InventoryDaily } from "@/types/database";
@@ -197,6 +197,54 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
     onSuccess(`Đã xóa nhập hàng + tồn cuối ngày ${date.split("-").reverse().join("/")}`);
   };
 
+  // Xuất tồn kho ngày hiện tại ra Excel (theo đơn vị nhập + đơn vị tính)
+  const handleExportDaily = () => {
+    if (!products.length) {
+      onError("Chưa có hàng hóa để xuất");
+      return;
+    }
+    const category = products[0]?.category ?? "";
+    const header = [
+      "Tên hàng hóa",
+      "Đơn vị nhập",
+      "Tồn đầu",
+      "Nhập hàng",
+      "Tồn cuối",
+      "Lượng dùng",
+      "Đơn vị tính",
+      "Quy đổi tồn cuối (đơn vị tính)",
+    ];
+    const dataRows = rows.map((row) => {
+      const product = products.find((p) => p.id === row.product_id);
+      if (!product) return null;
+      const openingDisp = toDisplay(row.opening_stock, product);
+      const received = parseFloat(row.received) || 0;
+      const closingDisp = parseFloat(row.closing_stock);
+      const usedDisp = !isNaN(closingDisp) ? openingDisp + received - closingDisp : null;
+      const closingBase = !isNaN(closingDisp) ? toBase(closingDisp, product) : null;
+      return [
+        product.name,
+        inputUnit(product),
+        Number(openingDisp.toFixed(4)),
+        received,
+        isNaN(closingDisp) ? "" : Number(closingDisp.toFixed(4)),
+        usedDisp !== null ? Number(usedDisp.toFixed(4)) : "",
+        product.unit,
+        closingBase !== null ? Number(closingBase.toFixed(4)) : "",
+      ];
+    }).filter((r): r is (string | number)[] => r !== null);
+
+    const ws = XLSX.utils.aoa_to_sheet([header, ...dataRows]);
+    ws["!cols"] = [
+      { wch: 25 }, { wch: 12 }, { wch: 10 }, { wch: 10 },
+      { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 20 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `${category} ${date}`);
+    XLSX.writeFile(wb, `ton-kho-${category}-${date}.xlsx`);
+    onSuccess(`Đã xuất ${dataRows.length} hàng hóa`);
+  };
+
   // Tải file Excel mẫu với danh sách hàng hóa hiện tại
   const handleDownloadTemplate = () => {
     const header = ["Tên hàng hóa", "Đơn vị nhập", "Nhập hàng", "Tồn cuối"];
@@ -333,6 +381,10 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
         <Button variant="outline" size="sm" className="gap-1.5" onClick={() => fileRef.current?.click()}>
           <Upload className="h-4 w-4" />
           Import
+        </Button>
+        <Button variant="outline" size="sm" className="gap-1.5 text-green-700 border-green-200 hover:bg-green-50" onClick={handleExportDaily}>
+          <FileDown className="h-4 w-4" />
+          Xuất Excel
         </Button>
         <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelUpload} />
         <Button variant="outline" size="sm" className="gap-1.5" onClick={() => buildRows(products, date)} disabled={loading}>
