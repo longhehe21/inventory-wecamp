@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Plus, Pencil, Trash2, Search, Package, Upload, Download } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Package, Upload, Download, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -164,6 +164,12 @@ export default function ProductsPage() {
   const bepCount = products.filter((p) => p.category === "Bếp").length;
   const quayCount = products.filter((p) => p.category === "Quầy").length;
 
+  // Misconfigured: package_unit equals base unit — silently scales values
+  // by package_size and produces wrong tồn đầu next day (bug from "đá")
+  const misconfigured = products.filter(
+    (p) => p.package_unit && p.package_size > 0 && p.package_unit === p.unit
+  );
+
   return (
     <div className="px-4 py-4 space-y-4">
       {/* Header */}
@@ -188,6 +194,32 @@ export default function ProductsPage() {
         </div>
         <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
       </div>
+
+      {/* Misconfig warning */}
+      {misconfigured.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-3 text-xs text-red-800">
+          <div className="flex items-start gap-2 mb-1">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+            <p className="font-semibold">
+              {misconfigured.length} hàng hóa cấu hình sai bao bì (Đơn vị bao bì trùng Đơn vị tính)
+            </p>
+          </div>
+          <p className="ml-6 mb-1.5">
+            Các hàng hóa này sẽ bị nhân/chia sai số khi nhập tồn kho. Sửa: chọn đơn vị bao bì khác đơn vị tính, hoặc xóa bao bì.
+          </p>
+          <div className="ml-6 flex flex-wrap gap-1">
+            {misconfigured.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => { setEditProduct(p); setShowForm(true); }}
+                className="bg-red-100 hover:bg-red-200 text-red-800 px-2 py-0.5 rounded-full font-medium"
+              >
+                {p.name} ({p.unit} = {p.package_unit})
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Excel format hint */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800">
@@ -253,11 +285,16 @@ export default function ProductsPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-semibold text-foreground truncate">{product.name}</span>
                         <Badge variant={product.category === "Bếp" ? "bep" : "quay"}>{product.category}</Badge>
+                        {product.package_unit === product.unit && product.package_size > 0 && (
+                          <span title="Đơn vị bao bì trùng đơn vị tính" className="text-red-600">
+                            <AlertTriangle className="h-4 w-4" />
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground">
                         Đơn vị: <strong>{product.unit}</strong>
                         {product.package_unit && product.package_size > 0 && (
-                          <span className="ml-1 text-blue-600">
+                          <span className={`ml-1 ${product.package_unit === product.unit ? "text-red-600 font-medium" : "text-blue-600"}`}>
                             · 1 {product.package_unit} = {formatNumber(product.package_size, 0)} {product.unit}
                           </span>
                         )}
