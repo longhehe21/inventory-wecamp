@@ -31,9 +31,15 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
   const [clearing, setClearing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Bếp uses package units (hộp, túi...) when configured; Quầy uses base units
+  // Bếp uses package units (hộp, túi...) when properly configured.
+  // Ignore misconfigured cases where package_unit equals base unit — that
+  // would silently scale all values by package_size without any unit label
+  // change, and is almost always a data-entry mistake.
   const usesPackageInput = (p: Product) =>
-    p.category === "Bếp" && !!p.package_unit && p.package_size > 0;
+    p.category === "Bếp"
+    && !!p.package_unit
+    && p.package_size > 0
+    && p.package_unit !== p.unit;
   const inputUnit = (p: Product) =>
     usesPackageInput(p) ? p.package_unit! : p.unit;
   const toDisplay = (baseVal: number, p: Product) =>
@@ -79,12 +85,14 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
       const newRows: RowState[] = prods.map((p) => {
         const today = todayMap[p.id];
         const prevClosing = prevMap[p.id] ?? 0;
+        // ALWAYS use yesterday's closing as today's opening — never trust the
+        // frozen opening_stock from today's record, since the previous day's
+        // closing may have been edited after today's record was created.
         if (today) {
-          // received/closing stored in DB as base units; convert for display when Lễ tân
           const toInputStr = (val: number) => parseFloat(toDisplay(val, p).toFixed(4)).toString();
           return {
             product_id: p.id,
-            opening_stock: today.opening_stock, // kept in base for internal reference
+            opening_stock: prevClosing,
             received: toInputStr(today.received),
             closing_stock: toInputStr(today.closing_stock),
             existing_id: today.id,
@@ -147,7 +155,7 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
       if (row.existing_id) {
         const { error } = await supabase
           .from("inventory_daily")
-          .update({ received, closing_stock: closing })
+          .update({ opening_stock: opening, received, closing_stock: closing })
           .eq("id", row.existing_id);
         if (error) errorCount++;
         else savedCount++;

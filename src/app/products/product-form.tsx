@@ -114,6 +114,13 @@ export function ProductForm({ product, onClose, onSaved, onError }: ProductFormP
       onError("Vui lòng chọn đơn vị tính cơ bản");
       return;
     }
+    if (hasPackage && form.package_unit === form.unit) {
+      onError(
+        `Đơn vị bao bì không được trùng đơn vị tính (${form.unit}). ` +
+        `Nếu hàng hóa nhập theo ${form.unit} thì để trống đơn vị bao bì.`
+      );
+      return;
+    }
     if (hasPackage && (!form.package_size || parseFloat(form.package_size) <= 0)) {
       onError("Nhập quy đổi: 1 " + form.package_unit + " = ? " + form.unit);
       return;
