@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Save, Upload, RefreshCw, Package, Download, Trash2, FileDown } from "lucide-react";
+import { Save, Upload, RefreshCw, Package, Download, Trash2, FileDown, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { Product, InventoryDaily } from "@/types/database";
@@ -29,7 +29,13 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
   const [saving, setSaving] = useState(false);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [search, setSearch] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Vietnamese diacritic-insensitive normalize for search ("ca rot" matches "cà rốt")
+  const stripDiacritics = (s: string) =>
+    s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
+  const searchNorm = stripDiacritics(search.trim());
 
   // Bếp uses package units (hộp, túi...) when properly configured.
   // Ignore misconfigured cases where package_unit equals base unit — that
@@ -415,6 +421,30 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
         </Button>
       </div>
 
+      {/* Search */}
+      <div className="px-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Tìm hàng hóa..."
+            className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground"
+              title="Xóa tìm kiếm"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Confirmation banner for "Xóa tất cả" */}
       {confirmingClear && (
         <div className="mx-4 p-3 bg-red-50 border border-red-200 rounded-xl">
@@ -442,9 +472,26 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
         </div>
       ) : (
         <div className="px-4 space-y-2">
-          {rows.map((row, idx) => {
-            const product = products.find((p) => p.id === row.product_id);
-            if (!product) return null;
+          {(() => {
+            // Render with original index so updateRow targets the right row in state
+            const indexed = rows.map((row, idx) => ({ row, idx }));
+            const filtered = searchNorm
+              ? indexed.filter(({ row }) => {
+                  const product = products.find((p) => p.id === row.product_id);
+                  return product ? stripDiacritics(product.name).includes(searchNorm) : false;
+                })
+              : indexed;
+
+            if (filtered.length === 0) {
+              return (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  Không tìm thấy hàng hóa khớp với &quot;{search}&quot;
+                </div>
+              );
+            }
+            return filtered.map(({ row, idx }) => {
+              const product = products.find((p) => p.id === row.product_id);
+              if (!product) return null;
             const actualUsed = getActualUsed(row, product);
             const usesPkg = usesPackageInput(product);
             const unit = inputUnit(product);
@@ -532,7 +579,8 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
                 )}
               </div>
             );
-          })}
+            });
+          })()}
         </div>
       )}
 
