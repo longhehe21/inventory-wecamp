@@ -2,15 +2,17 @@
 -- wECAMP Finance Schema - Chạy trong Supabase SQL Editor
 -- ============================================================
 
--- 1. Thu quầy bar và vé vào (theo ngày)
+-- 1. Thu (theo ngày, có nguồn: bar = quầy bar, ticket = vé vào)
 CREATE TABLE IF NOT EXISTS daily_revenue (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  date DATE NOT NULL UNIQUE,
+  date DATE NOT NULL,
+  source TEXT NOT NULL CHECK (source IN ('bar', 'ticket')),
   cash NUMERIC NOT NULL DEFAULT 0,
   transfer NUMERIC NOT NULL DEFAULT 0,
   note TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (date, source)
 );
 
 -- 2. Chi (nhiều bản ghi/ngày)

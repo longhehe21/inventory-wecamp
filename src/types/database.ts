@@ -58,10 +58,12 @@ export interface FabiSale {
 // ───────────────────────────────── Finance ─────────────────────────────────
 
 export type PaymentType = "cash" | "transfer";
+export type RevenueSource = "bar" | "ticket";
 
 export interface DailyRevenue {
   id: string;
   date: string;
+  source: RevenueSource;
   cash: number;
   transfer: number;
   note: string | null;

@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, Save, Download, Upload, FileDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, Download, Upload, FileDown, GlassWater, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
-import { DailyRevenue } from "@/types/database";
+import { DailyRevenue, RevenueSource } from "@/types/database";
 import { formatCurrency } from "@/lib/utils";
 import * as XLSX from "xlsx";
 
@@ -19,6 +19,11 @@ interface DayRow {
   existing_id?: string;
 }
 
+const SOURCES: { key: RevenueSource; label: string; icon: React.ElementType }[] = [
+  { key: "bar", label: "Quầy bar", icon: GlassWater },
+  { key: "ticket", label: "Vé vào", icon: Ticket },
+];
+
 function getDaysInMonth(year: number, month: number): string[] {
   const days: string[] = [];
   const last = new Date(year, month + 1, 0).getDate();
@@ -30,6 +35,7 @@ function getDaysInMonth(year: number, month: number): string[] {
 
 export function RevenueTab({ onError, onSuccess }: Props) {
   const today = new Date();
+  const [source, setSource] = useState<RevenueSource>("bar");
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [rows, setRows] = useState<DayRow[]>([]);
@@ -39,6 +45,7 @@ export function RevenueTab({ onError, onSuccess }: Props) {
 
   const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
   const monthLabel = `Tháng ${month + 1}/${year}`;
+  const sourceLabel = SOURCES.find((s) => s.key === source)?.label ?? "";
 
   const fetchMonth = useCallback(async () => {
     setLoading(true);
@@ -46,6 +53,7 @@ export function RevenueTab({ onError, onSuccess }: Props) {
     const { data, error } = await supabase
       .from("daily_revenue")
       .select("*")
+      .eq("source", source)
       .gte("date", `${monthStr}-01`)
       .lte("date", `${monthStr}-${String(lastDay).padStart(2, "0")}`)
       .order("date");
@@ -70,7 +78,7 @@ export function RevenueTab({ onError, onSuccess }: Props) {
     );
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, month]);
+  }, [year, month, source]);
 
   useEffect(() => { fetchMonth(); }, [fetchMonth]);
 
@@ -98,11 +106,9 @@ export function RevenueTab({ onError, onSuccess }: Props) {
     for (const row of rows) {
       const cash = parseFloat(row.cash);
       const transfer = parseFloat(row.transfer);
-      // Skip empty rows
       const hasCash = !isNaN(cash) && row.cash !== "";
       const hasTransfer = !isNaN(transfer) && row.transfer !== "";
       if (!hasCash && !hasTransfer && !row.existing_id) continue;
-      // If user cleared both fields on an existing row, delete it
       if (!hasCash && !hasTransfer && row.existing_id) {
         const { error } = await supabase.from("daily_revenue").delete().eq("id", row.existing_id);
         if (error) errorCount++;
@@ -111,6 +117,7 @@ export function RevenueTab({ onError, onSuccess }: Props) {
       }
       const payload = {
         date: row.date,
+        source,
         cash: hasCash ? cash : 0,
         transfer: hasTransfer ? transfer : 0,
         note: null,
@@ -130,15 +137,13 @@ export function RevenueTab({ onError, onSuccess }: Props) {
     }
     setSaving(false);
     if (errorCount > 0) onError(`Lỗi lưu ${errorCount} dòng`);
-    else onSuccess(`Đã lưu ${savedCount} ngày`);
+    else onSuccess(`Đã lưu ${savedCount} ngày (${sourceLabel})`);
     fetchMonth();
   };
 
-  // Totals
   const totalCash = rows.reduce((s, r) => s + (parseFloat(r.cash) || 0), 0);
   const totalTransfer = rows.reduce((s, r) => s + (parseFloat(r.transfer) || 0), 0);
 
-  // Excel export
   const handleExport = () => {
     const header = ["Ngày", "Tiền mặt", "Chuyển khoản", "Tổng"];
     const dataRows = rows.map((r) => {
@@ -150,8 +155,8 @@ export function RevenueTab({ onError, onSuccess }: Props) {
     const ws = XLSX.utils.aoa_to_sheet([header, ...dataRows, totalRow]);
     ws["!cols"] = [{ wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Thu");
-    XLSX.writeFile(wb, `thu-${monthStr}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, sourceLabel);
+    XLSX.writeFile(wb, `thu-${source}-${monthStr}.xlsx`);
   };
 
   const handleDownloadTemplate = () => {
@@ -160,11 +165,10 @@ export function RevenueTab({ onError, onSuccess }: Props) {
     const ws = XLSX.utils.aoa_to_sheet([header, ...dataRows]);
     ws["!cols"] = [{ wch: 12 }, { wch: 15 }, { wch: 15 }];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Thu");
-    XLSX.writeFile(wb, `mau-thu-${monthStr}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, sourceLabel);
+    XLSX.writeFile(wb, `mau-thu-${source}-${monthStr}.xlsx`);
   };
 
-  // Excel import
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -187,7 +191,6 @@ export function RevenueTab({ onError, onSuccess }: Props) {
           if (!row?.length) return;
           const rawDate = safe(row[0]).trim();
           if (!rawDate || rawDate.toUpperCase() === "TỔNG") return;
-          // Normalize date — accept YYYY-MM-DD or DD/MM/YYYY
           let dateStr = rawDate;
           if (rawDate.includes("/")) {
             const [d, m, y] = rawDate.split("/").map((s) => s.trim());
@@ -211,7 +214,7 @@ export function RevenueTab({ onError, onSuccess }: Props) {
             return r;
           })
         );
-        onSuccess(`Đã nhập ${matched} ngày từ Excel`);
+        onSuccess(`Đã nhập ${matched} ngày từ Excel vào ${sourceLabel}`);
       } catch (err) {
         onError("Lỗi đọc Excel: " + (err instanceof Error ? err.message : "định dạng sai"));
       }
@@ -222,6 +225,28 @@ export function RevenueTab({ onError, onSuccess }: Props) {
 
   return (
     <div className="space-y-3">
+      {/* Source sub-tabs */}
+      <div className="px-4">
+        <div className="grid grid-cols-2 gap-2">
+          {SOURCES.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setSource(key)}
+              className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                source === key
+                  ? key === "bar"
+                    ? "bg-amber-500 text-white"
+                    : "bg-pink-500 text-white"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Month navigator */}
       <div className="px-4 flex items-center gap-2 bg-muted rounded-xl p-2 mx-4">
         <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => changeMonth(-1)}>
@@ -260,18 +285,18 @@ export function RevenueTab({ onError, onSuccess }: Props) {
         </Button>
       </div>
 
-      {/* Totals */}
+      {/* Totals (per source) */}
       <div className="px-4 grid grid-cols-3 gap-2">
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-center">
-          <p className="text-[10px] text-emerald-700">Tổng tiền mặt</p>
+          <p className="text-[10px] text-emerald-700">Tiền mặt</p>
           <p className="font-bold text-emerald-800 text-sm">{formatCurrency(totalCash)}</p>
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-2.5 text-center">
-          <p className="text-[10px] text-blue-700">Tổng chuyển khoản</p>
+          <p className="text-[10px] text-blue-700">Chuyển khoản</p>
           <p className="font-bold text-blue-800 text-sm">{formatCurrency(totalTransfer)}</p>
         </div>
         <div className="bg-purple-50 border border-purple-200 rounded-xl p-2.5 text-center">
-          <p className="text-[10px] text-purple-700">Tổng doanh thu</p>
+          <p className="text-[10px] text-purple-700">Tổng {sourceLabel}</p>
           <p className="font-bold text-purple-800 text-sm">{formatCurrency(totalCash + totalTransfer)}</p>
         </div>
       </div>
@@ -331,7 +356,7 @@ export function RevenueTab({ onError, onSuccess }: Props) {
 
           <Button className="w-full h-12 text-base gap-2 mt-3" onClick={handleSaveAll} disabled={saving}>
             <Save className="h-5 w-5" />
-            {saving ? "Đang lưu..." : "Lưu tất cả"}
+            {saving ? "Đang lưu..." : `Lưu ${sourceLabel}`}
           </Button>
         </div>
       )}
