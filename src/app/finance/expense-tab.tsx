@@ -1,10 +1,11 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Plus, Trash2, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Trash2, Calendar, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { Expense, PaymentType } from "@/types/database";
 import { formatCurrency } from "@/lib/utils";
+import { useAuth } from "@/contexts/auth-context";
 
 interface Props {
   onError: (msg: string) => void;
@@ -26,6 +27,7 @@ interface DraftRow {
 const emptyDraft: DraftRow = { name: "", payment_type: "cash", amount: "" };
 
 export function ExpenseTab({ onError, onSuccess }: Props) {
+  const { profile } = useAuth();
   const [date, setDate] = useState(getTodayStr());
   const [filter, setFilter] = useState<Filter>("all");
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -41,8 +43,29 @@ export function ExpenseTab({ onError, onSuccess }: Props) {
       .select("*")
       .eq("date", date)
       .order("created_at");
-    if (error) onError("Lỗi tải dữ liệu: " + error.message);
-    else setExpenses((data as Expense[]) || []);
+    if (error) {
+      onError("Lỗi tải dữ liệu: " + error.message);
+      setLoading(false);
+      return;
+    }
+    const rows = (data as Expense[]) || [];
+
+    // Resolve names for created_by user IDs
+    const ids = Array.from(new Set(rows.map((r) => r.created_by).filter((v): v is string => !!v)));
+    let nameMap: Record<string, string> = {};
+    if (ids.length) {
+      const { data: profiles } = await supabase
+        .from("user_profiles")
+        .select("id, full_name, email")
+        .in("id", ids);
+      nameMap = Object.fromEntries(
+        ((profiles as { id: string; full_name: string; email: string }[]) || []).map((p) => [
+          p.id,
+          p.full_name || p.email,
+        ])
+      );
+    }
+    setExpenses(rows.map((r) => ({ ...r, created_by_name: r.created_by ? nameMap[r.created_by] ?? null : null })));
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
@@ -88,6 +111,7 @@ export function ExpenseTab({ onError, onSuccess }: Props) {
       name: d.name.trim(),
       payment_type: d.payment_type,
       amount: parseFloat(d.amount),
+      created_by: profile?.id ?? null,
     }));
     const { error } = await supabase.from("expenses").insert(payload);
     setSaving(false);
@@ -201,6 +225,7 @@ export function ExpenseTab({ onError, onSuccess }: Props) {
                   <th className="text-left px-3 py-2 font-semibold">Tên</th>
                   <th className="text-left px-3 py-2 font-semibold w-28">Loại</th>
                   <th className="text-right px-3 py-2 font-semibold w-32">Số tiền</th>
+                  <th className="text-left px-3 py-2 font-semibold w-32">Người nhập</th>
                   <th className="w-10" />
                 </tr>
               </thead>
@@ -219,6 +244,16 @@ export function ExpenseTab({ onError, onSuccess }: Props) {
                       </span>
                     </td>
                     <td className="px-3 py-2 text-right font-medium">{formatCurrency(e.amount)}</td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                      {e.created_by_name ? (
+                        <span className="inline-flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          {e.created_by_name}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground/50">—</span>
+                      )}
+                    </td>
                     <td className="px-1 py-2">
                       {deleting === e.id ? (
                         <div className="flex gap-1">
@@ -241,9 +276,17 @@ export function ExpenseTab({ onError, onSuccess }: Props) {
 
       {/* Add new expenses */}
       <div className="px-4 pb-4 space-y-2">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-          Thêm khoản chi mới
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            Thêm khoản chi mới
+          </p>
+          {profile && (
+            <span className="text-[10px] text-muted-foreground inline-flex items-center gap-1">
+              <User className="h-3 w-3" />
+              {profile.full_name || profile.email}
+            </span>
+          )}
+        </div>
         {drafts.map((d, idx) => (
           <div key={idx} className="border rounded-xl bg-white p-3 space-y-2">
             <div className="grid grid-cols-12 gap-2">

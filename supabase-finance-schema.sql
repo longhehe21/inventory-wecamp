@@ -15,13 +15,14 @@ CREATE TABLE IF NOT EXISTS daily_revenue (
   UNIQUE (date, source)
 );
 
--- 2. Chi (nhiều bản ghi/ngày)
+-- 2. Chi (nhiều bản ghi/ngày, track ai nhập)
 CREATE TABLE IF NOT EXISTS expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   date DATE NOT NULL,
   name TEXT NOT NULL,
   payment_type TEXT NOT NULL CHECK (payment_type IN ('cash', 'transfer')),
   amount NUMERIC NOT NULL DEFAULT 0,
+  created_by UUID REFERENCES user_profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
