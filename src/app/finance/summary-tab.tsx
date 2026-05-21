@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Wallet, Landmark, Banknote, TrendingUp, TrendingDown, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
-import { DailyRevenue, Expense, CashDeposit } from "@/types/database";
 import { formatCurrency } from "@/lib/utils";
 
 interface Props {
