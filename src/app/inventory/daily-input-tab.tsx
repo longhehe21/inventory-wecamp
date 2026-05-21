@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Save, Upload, RefreshCw, Package, Download, Trash2, FileDown, Search, X, User } from "lucide-react";
+import { Save, Upload, RefreshCw, Package, Download, Trash2, FileDown, Search, X, User, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase";
 import { Product, InventoryDaily } from "@/types/database";
 import { formatNumber } from "@/lib/utils";
@@ -33,6 +34,8 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [search, setSearch] = useState("");
+  // Negative "Lượng dùng" warning modal
+  const [negativeRows, setNegativeRows] = useState<{ name: string; used: number; unit: string }[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Vietnamese diacritic-insensitive normalize for search ("ca rot" matches "cà rốt")
@@ -160,7 +163,62 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
     });
   };
 
-  const handleSaveAll = async () => {
+  // Web Audio API beep — short repeated triangle wave so the warning is audible
+  const playWarningSound = () => {
+    try {
+      const W = window as unknown as { webkitAudioContext?: typeof AudioContext; AudioContext: typeof AudioContext };
+      const Ctx = W.AudioContext || W.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const beep = (start: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(880, ctx.currentTime + start);
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime + start);
+        gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + start + 0.2);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(ctx.currentTime + start);
+        osc.stop(ctx.currentTime + start + 0.22);
+      };
+      beep(0);
+      beep(0.28);
+      beep(0.56);
+    } catch {
+      // Ignore audio errors silently
+    }
+  };
+
+  // Find rows with negative actual_used (closing > opening + received)
+  const collectNegativeRows = () =>
+    rows
+      .map((row) => {
+        const product = products.find((p) => p.id === row.product_id);
+        if (!product) return null;
+        const closingDisplay = parseFloat(row.closing_stock);
+        if (isNaN(closingDisplay) || row.closing_stock === "") return null;
+        const receivedDisplay = parseFloat(row.received) || 0;
+        const openingDisplay = toDisplay(row.opening_stock, product);
+        const used = openingDisplay + receivedDisplay - closingDisplay;
+        if (used < 0) {
+          return { name: product.name, used, unit: inputUnit(product) };
+        }
+        return null;
+      })
+      .filter((r): r is { name: string; used: number; unit: string } => r !== null);
+
+  const handleSaveAll = () => {
+    const negatives = collectNegativeRows();
+    if (negatives.length > 0) {
+      setNegativeRows(negatives);
+      playWarningSound();
+      return;
+    }
+    performSave();
+  };
+
+  const performSave = async () => {
     setSaving(true);
     let savedCount = 0;
     let errorCount = 0;
@@ -632,6 +690,53 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
           {saving ? "Đang lưu..." : "Lưu tồn kho"}
         </Button>
       </div>
+
+      {/* Warning modal: negative "Lượng dùng" */}
+      <Dialog open={negativeRows.length > 0} onOpenChange={(open) => !open && setNegativeRows([])}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <AlertTriangle className="h-5 w-5" />
+              Cảnh báo: Lượng dùng âm
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-foreground">
+              Có <strong>{negativeRows.length}</strong> hàng hóa ngày{" "}
+              <strong>{date.split("-").reverse().join("/")}</strong> có lượng dùng âm, vui lòng xem lại:
+            </p>
+            <div className="max-h-64 overflow-y-auto bg-red-50 border border-red-200 rounded-lg p-3 space-y-1.5">
+              {negativeRows.map((r) => (
+                <div key={r.name} className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-foreground">{r.name}</span>
+                  <span className="text-red-700 font-semibold">
+                    {formatNumber(r.used, 2)} {r.unit}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Lượng dùng âm thường do nhập sai Tồn cuối lớn hơn (Tồn đầu + Nhập hàng). Bấm <strong>Xem lại</strong> để kiểm tra, hoặc <strong>Vẫn tiếp tục</strong> nếu chắc chắn đúng.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => setNegativeRows([])}>
+                Xem lại
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={() => {
+                  setNegativeRows([]);
+                  performSave();
+                }}
+                disabled={saving}
+              >
+                Vẫn tiếp tục
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
