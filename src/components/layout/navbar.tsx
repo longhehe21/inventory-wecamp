@@ -15,6 +15,7 @@ import {
   LogOut,
   KeyRound,
   ChevronDown,
+  Wallet,
 } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: React.ElementType; roles: string[] };
@@ -23,6 +24,7 @@ const ALL_NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin"] },
   { href: "/products", label: "Hàng hóa", icon: Package, roles: ["admin"] },
   { href: "/inventory", label: "Tồn kho", icon: BarChart3, roles: ["admin", "supervisor", "manager", "employee"] },
+  { href: "/finance", label: "Thu chi", icon: Wallet, roles: ["admin", "supervisor", "manager"] },
   { href: "/recipes", label: "Công thức", icon: BookOpen, roles: ["admin"] },
   { href: "/reports", label: "Đối soát", icon: FileSpreadsheet, roles: ["admin", "supervisor"] },
   { href: "/fabi", label: "Fabi", icon: FileSpreadsheet, roles: ["admin"] },

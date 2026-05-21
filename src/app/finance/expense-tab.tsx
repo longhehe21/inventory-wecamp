@@ -1,0 +1,299 @@
+"use client";
+import { useState, useEffect, useCallback } from "react";
+import { ChevronLeft, ChevronRight, Plus, Trash2, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase";
+import { Expense, PaymentType } from "@/types/database";
+import { formatCurrency } from "@/lib/utils";
+
+interface Props {
+  onError: (msg: string) => void;
+  onSuccess: (msg: string) => void;
+}
+
+type Filter = "all" | "cash" | "transfer";
+
+function getTodayStr(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
+interface DraftRow {
+  name: string;
+  payment_type: PaymentType;
+  amount: string;
+}
+
+const emptyDraft: DraftRow = { name: "", payment_type: "cash", amount: "" };
+
+export function ExpenseTab({ onError, onSuccess }: Props) {
+  const [date, setDate] = useState(getTodayStr());
+  const [filter, setFilter] = useState<Filter>("all");
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [drafts, setDrafts] = useState<DraftRow[]>([{ ...emptyDraft }]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const fetchExpenses = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("expenses")
+      .select("*")
+      .eq("date", date)
+      .order("created_at");
+    if (error) onError("Lỗi tải dữ liệu: " + error.message);
+    else setExpenses((data as Expense[]) || []);
+    setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date]);
+
+  useEffect(() => { fetchExpenses(); }, [fetchExpenses]);
+
+  const changeDate = (delta: number) => {
+    const d = new Date(date);
+    d.setDate(d.getDate() + delta);
+    setDate(d.toISOString().split("T")[0]);
+  };
+
+  const updateDraft = (idx: number, field: keyof DraftRow, val: string) => {
+    setDrafts((prev) => {
+      const next = [...prev];
+      const cur = next[idx];
+      if (field === "amount") {
+        next[idx] = { ...cur, amount: val.replace(",", ".") };
+      } else if (field === "payment_type") {
+        next[idx] = { ...cur, payment_type: val as PaymentType };
+      } else {
+        next[idx] = { ...cur, name: val };
+      }
+      return next;
+    });
+  };
+
+  const addDraft = () => setDrafts((prev) => [...prev, { ...emptyDraft }]);
+  const removeDraft = (idx: number) =>
+    setDrafts((prev) => prev.filter((_, i) => i !== idx).length ? prev.filter((_, i) => i !== idx) : [{ ...emptyDraft }]);
+
+  const handleSaveDrafts = async () => {
+    const valid = drafts
+      .map((d, i) => ({ ...d, i }))
+      .filter((d) => d.name.trim() && parseFloat(d.amount) > 0);
+    if (valid.length === 0) {
+      onError("Vui lòng nhập ít nhất 1 dòng (tên + số tiền > 0)");
+      return;
+    }
+    setSaving(true);
+    const payload = valid.map((d) => ({
+      date,
+      name: d.name.trim(),
+      payment_type: d.payment_type,
+      amount: parseFloat(d.amount),
+    }));
+    const { error } = await supabase.from("expenses").insert(payload);
+    setSaving(false);
+    if (error) {
+      onError("Lỗi lưu: " + error.message);
+      return;
+    }
+    onSuccess(`Đã thêm ${valid.length} khoản chi`);
+    setDrafts([{ ...emptyDraft }]);
+    fetchExpenses();
+  };
+
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from("expenses").delete().eq("id", id);
+    setDeleting(null);
+    if (error) {
+      onError("Lỗi xóa: " + error.message);
+      return;
+    }
+    onSuccess("Đã xóa");
+    setExpenses((prev) => prev.filter((e) => e.id !== id));
+  };
+
+  // Apply filter
+  const filteredExpenses = expenses.filter((e) =>
+    filter === "all" ? true : e.payment_type === filter
+  );
+
+  const totalCash = expenses.filter((e) => e.payment_type === "cash").reduce((s, e) => s + e.amount, 0);
+  const totalTransfer = expenses.filter((e) => e.payment_type === "transfer").reduce((s, e) => s + e.amount, 0);
+
+  return (
+    <div className="space-y-3">
+      {/* Date picker */}
+      <div className="px-4 flex items-center gap-2 bg-muted rounded-xl p-2 mx-4">
+        <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0" onClick={() => changeDate(-1)}>
+          <ChevronLeft className="h-5 w-5" />
+        </Button>
+        <div className="flex-1 flex items-center justify-center gap-2">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="text-sm font-semibold bg-transparent outline-none text-center"
+            max={getTodayStr()}
+          />
+        </div>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-9 w-9 shrink-0"
+          onClick={() => changeDate(1)}
+          disabled={date >= getTodayStr()}
+        >
+          <ChevronRight className="h-5 w-5" />
+        </Button>
+      </div>
+
+      {/* Totals */}
+      <div className="px-4 grid grid-cols-3 gap-2">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-center">
+          <p className="text-[10px] text-emerald-700">Tiền mặt</p>
+          <p className="font-bold text-emerald-800 text-sm">{formatCurrency(totalCash)}</p>
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-2.5 text-center">
+          <p className="text-[10px] text-blue-700">Chuyển khoản</p>
+          <p className="font-bold text-blue-800 text-sm">{formatCurrency(totalTransfer)}</p>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-xl p-2.5 text-center">
+          <p className="text-[10px] text-red-700">Tổng chi</p>
+          <p className="font-bold text-red-800 text-sm">{formatCurrency(totalCash + totalTransfer)}</p>
+        </div>
+      </div>
+
+      {/* Filter */}
+      <div className="px-4 flex gap-2">
+        {([
+          { key: "all", label: "Tất cả" },
+          { key: "cash", label: "Tiền mặt" },
+          { key: "transfer", label: "Chuyển khoản" },
+        ] as { key: Filter; label: string }[]).map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setFilter(key)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              filter === key
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Existing expenses list */}
+      <div className="px-4">
+        {loading ? (
+          <div className="space-y-1.5">
+            {[1, 2].map((i) => <div key={i} className="h-12 bg-muted rounded animate-pulse" />)}
+          </div>
+        ) : filteredExpenses.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">Chưa có khoản chi nào ngày này</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border bg-white">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="text-left px-3 py-2 font-semibold w-10">STT</th>
+                  <th className="text-left px-3 py-2 font-semibold">Tên</th>
+                  <th className="text-left px-3 py-2 font-semibold w-28">Loại</th>
+                  <th className="text-right px-3 py-2 font-semibold w-32">Số tiền</th>
+                  <th className="w-10" />
+                </tr>
+              </thead>
+              <tbody>
+                {filteredExpenses.map((e, i) => (
+                  <tr key={e.id} className="border-b last:border-0">
+                    <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
+                    <td className="px-3 py-2 font-medium">{e.name}</td>
+                    <td className="px-3 py-2">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                        e.payment_type === "cash"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}>
+                        {e.payment_type === "cash" ? "💵 Tiền mặt" : "🏦 Chuyển khoản"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right font-medium">{formatCurrency(e.amount)}</td>
+                    <td className="px-1 py-2">
+                      {deleting === e.id ? (
+                        <div className="flex gap-1">
+                          <Button size="icon" variant="destructive" className="h-7 w-7 text-xs" onClick={() => handleDelete(e.id)}>✓</Button>
+                          <Button size="icon" variant="outline" className="h-7 w-7 text-xs" onClick={() => setDeleting(null)}>✕</Button>
+                        </div>
+                      ) : (
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleting(e.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Add new expenses */}
+      <div className="px-4 pb-4 space-y-2">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          Thêm khoản chi mới
+        </p>
+        {drafts.map((d, idx) => (
+          <div key={idx} className="border rounded-xl bg-white p-3 space-y-2">
+            <div className="grid grid-cols-12 gap-2">
+              <input
+                type="text"
+                value={d.name}
+                onChange={(e) => updateDraft(idx, "name", e.target.value)}
+                placeholder="Tên khoản chi (VD: Mua gas, trả lương...)"
+                className="col-span-12 h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <select
+                value={d.payment_type}
+                onChange={(e) => updateDraft(idx, "payment_type", e.target.value)}
+                className="col-span-5 h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="cash">💵 Tiền mặt</option>
+                <option value="transfer">🏦 Chuyển khoản</option>
+              </select>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={d.amount}
+                onChange={(e) => updateDraft(idx, "amount", e.target.value)}
+                placeholder="Số tiền"
+                className="col-span-6 h-9 rounded-md border border-input bg-background px-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <Button
+                size="icon"
+                variant="ghost"
+                className="col-span-1 h-9 w-9 text-destructive hover:text-destructive"
+                onClick={() => removeDraft(idx)}
+                disabled={drafts.length === 1 && !d.name && !d.amount}
+                title="Xóa dòng"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        ))}
+
+        <Button variant="outline" className="w-full gap-1.5" onClick={addDraft}>
+          <Plus className="h-4 w-4" />
+          Thêm dòng
+        </Button>
+
+        <Button className="w-full h-11 gap-2" onClick={handleSaveDrafts} disabled={saving}>
+          {saving ? "Đang lưu..." : "Lưu các khoản chi"}
+        </Button>
+      </div>
+    </div>
+  );
+}

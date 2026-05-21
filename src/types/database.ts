@@ -55,6 +55,37 @@ export interface FabiSale {
   created_at: string;
 }
 
+// ───────────────────────────────── Finance ─────────────────────────────────
+
+export type PaymentType = "cash" | "transfer";
+
+export interface DailyRevenue {
+  id: string;
+  date: string;
+  cash: number;
+  transfer: number;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Expense {
+  id: string;
+  date: string;
+  name: string;
+  payment_type: PaymentType;
+  amount: number;
+  created_at: string;
+}
+
+export interface CashDeposit {
+  id: string;
+  date: string;
+  amount: number;
+  note: string | null;
+  created_at: string;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -82,6 +113,21 @@ export interface Database {
         Row: Unit;
         Insert: Omit<Unit, "id" | "created_at">;
         Update: Partial<Omit<Unit, "id" | "created_at">>;
+      };
+      daily_revenue: {
+        Row: DailyRevenue;
+        Insert: Omit<DailyRevenue, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<DailyRevenue, "id" | "created_at" | "updated_at">>;
+      };
+      expenses: {
+        Row: Expense;
+        Insert: Omit<Expense, "id" | "created_at">;
+        Update: Partial<Omit<Expense, "id" | "created_at">>;
+      };
+      cash_deposits: {
+        Row: CashDeposit;
+        Insert: Omit<CashDeposit, "id" | "created_at">;
+        Update: Partial<Omit<CashDeposit, "id" | "created_at">>;
       };
     };
   };

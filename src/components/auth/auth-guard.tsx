@@ -28,14 +28,20 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
     if (!profile) return;
 
-    if (profile.role === "employee" || profile.role === "manager") {
-      // Employees and managers can only access /inventory
+    if (profile.role === "employee") {
+      // Employees can only access /inventory
       if (!pathname.startsWith("/inventory")) {
         router.replace("/inventory");
       }
+    } else if (profile.role === "manager") {
+      // Managers can access /inventory and /finance
+      const allowed = ["/inventory", "/finance"];
+      if (!allowed.some((r) => pathname.startsWith(r))) {
+        router.replace("/inventory");
+      }
     } else if (profile.role === "supervisor") {
-      // Supervisors can access /inventory and /reports
-      const allowed = ["/inventory", "/reports"];
+      // Supervisors can access /inventory, /reports and /finance
+      const allowed = ["/inventory", "/reports", "/finance"];
       if (!allowed.some((r) => pathname.startsWith(r))) {
         router.replace("/inventory");
       }
