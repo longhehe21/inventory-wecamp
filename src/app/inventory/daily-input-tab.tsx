@@ -1,10 +1,11 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Save, Upload, RefreshCw, Package, Download, Trash2, FileDown, Search, X } from "lucide-react";
+import { Save, Upload, RefreshCw, Package, Download, Trash2, FileDown, Search, X, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { Product, InventoryDaily } from "@/types/database";
 import { formatNumber } from "@/lib/utils";
+import { useAuth } from "@/contexts/auth-context";
 import * as XLSX from "xlsx";
 
 interface RowState {
@@ -13,6 +14,7 @@ interface RowState {
   received: string;     // editable
   closing_stock: string; // editable
   existing_id?: string;
+  updated_by_name?: string | null;
 }
 
 interface Props {
@@ -24,6 +26,7 @@ interface Props {
 }
 
 export function DailyInputTab({ date, products, loadingProducts, onError, onSuccess }: Props) {
+  const { profile } = useAuth();
   const [rows, setRows] = useState<RowState[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -88,6 +91,28 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
         todayMap[r.product_id] = r;
       });
 
+      // Resolve user names for updated_by ids
+      const editorIds = Array.from(
+        new Set(
+          (todayRes.data || [])
+            .map((r: InventoryDaily) => r.updated_by)
+            .filter((v): v is string => !!v)
+        )
+      );
+      let nameMap: Record<string, string> = {};
+      if (editorIds.length) {
+        const { data: profiles } = await supabase
+          .from("user_profiles")
+          .select("id, full_name, email")
+          .in("id", editorIds);
+        nameMap = Object.fromEntries(
+          ((profiles as { id: string; full_name: string; email: string }[]) || []).map((u) => [
+            u.id,
+            u.full_name || u.email,
+          ])
+        );
+      }
+
       const newRows: RowState[] = prods.map((p) => {
         const today = todayMap[p.id];
         const prevClosing = prevMap[p.id] ?? 0;
@@ -102,6 +127,7 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
             received: toInputStr(today.received),
             closing_stock: toInputStr(today.closing_stock),
             existing_id: today.id,
+            updated_by_name: today.updated_by ? nameMap[today.updated_by] ?? null : null,
           };
         }
         return {
@@ -110,6 +136,7 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
           received: "0",
           closing_stock: "",
           existing_id: undefined,
+          updated_by_name: null,
         };
       });
 
@@ -156,12 +183,18 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
         opening_stock: opening,
         received,
         closing_stock: closing,
+        updated_by: profile?.id ?? null,
       };
 
       if (row.existing_id) {
         const { error } = await supabase
           .from("inventory_daily")
-          .update({ opening_stock: opening, received, closing_stock: closing })
+          .update({
+            opening_stock: opening,
+            received,
+            closing_stock: closing,
+            updated_by: profile?.id ?? null,
+          })
           .eq("id", row.existing_id);
         if (error) errorCount++;
         else savedCount++;
@@ -575,6 +608,14 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
                       </span>
                     )}
                     {actualUsed < 0 && " ⚠️ âm - kiểm tra lại"}
+                  </div>
+                )}
+
+                {/* Người nhập */}
+                {row.updated_by_name && (
+                  <div className="px-3 pb-2 text-[10px] text-muted-foreground inline-flex items-center gap-1">
+                    <User className="h-3 w-3" />
+                    Người nhập: {row.updated_by_name}
                   </div>
                 )}
               </div>

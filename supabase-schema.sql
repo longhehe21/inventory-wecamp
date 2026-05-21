@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS inventory_daily (
   received NUMERIC NOT NULL DEFAULT 0,
   closing_stock NUMERIC NOT NULL DEFAULT 0,
   actual_used NUMERIC GENERATED ALWAYS AS (opening_stock + received - closing_stock) STORED,
+  updated_by UUID REFERENCES user_profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (product_id, date)
 );

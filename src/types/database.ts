@@ -29,6 +29,8 @@ export interface InventoryDaily {
   received: number;
   closing_stock: number;
   actual_used: number; // opening + received - closing
+  updated_by: string | null;       // last user who entered/edited this row
+  updated_by_name?: string | null; // resolved on client
   product?: Product;
   created_at: string;
 }
