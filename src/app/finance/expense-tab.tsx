@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Plus, Trash2, Calendar, User } from "lucide-react";
+import { Plus, Trash2, User, CalendarRange } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { Expense, PaymentType } from "@/types/database";
@@ -18,6 +18,11 @@ function getTodayStr(): string {
   return new Date().toISOString().split("T")[0];
 }
 
+function getMonthStartStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
 interface DraftRow {
   name: string;
   payment_type: PaymentType;
@@ -28,7 +33,11 @@ const emptyDraft: DraftRow = { name: "", payment_type: "cash", amount: "" };
 
 export function ExpenseTab({ onError, onSuccess }: Props) {
   const { profile } = useAuth();
-  const [date, setDate] = useState(getTodayStr());
+  // Range filter for viewing
+  const [dateFrom, setDateFrom] = useState(getMonthStartStr());
+  const [dateTo, setDateTo] = useState(getTodayStr());
+  // Separate date used when adding new expenses
+  const [newDate, setNewDate] = useState(getTodayStr());
   const [filter, setFilter] = useState<Filter>("all");
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [drafts, setDrafts] = useState<DraftRow[]>([{ ...emptyDraft }]);
@@ -37,11 +46,18 @@ export function ExpenseTab({ onError, onSuccess }: Props) {
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const fetchExpenses = useCallback(async () => {
+    if (dateFrom > dateTo) {
+      onError("Khoảng ngày không hợp lệ (Từ ngày > Đến ngày)");
+      setExpenses([]);
+      return;
+    }
     setLoading(true);
     const { data, error } = await supabase
       .from("expenses")
       .select("*")
-      .eq("date", date)
+      .gte("date", dateFrom)
+      .lte("date", dateTo)
+      .order("date", { ascending: false })
       .order("created_at");
     if (error) {
       onError("Lỗi tải dữ liệu: " + error.message);
@@ -68,15 +84,9 @@ export function ExpenseTab({ onError, onSuccess }: Props) {
     setExpenses(rows.map((r) => ({ ...r, created_by_name: r.created_by ? nameMap[r.created_by] ?? null : null })));
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date]);
+  }, [dateFrom, dateTo]);
 
   useEffect(() => { fetchExpenses(); }, [fetchExpenses]);
-
-  const changeDate = (delta: number) => {
-    const d = new Date(date);
-    d.setDate(d.getDate() + delta);
-    setDate(d.toISOString().split("T")[0]);
-  };
 
   const updateDraft = (idx: number, field: keyof DraftRow, val: string) => {
     setDrafts((prev) => {
@@ -107,7 +117,7 @@ export function ExpenseTab({ onError, onSuccess }: Props) {
     }
     setSaving(true);
     const payload = valid.map((d) => ({
-      date,
+      date: newDate,
       name: d.name.trim(),
       payment_type: d.payment_type,
       amount: parseFloat(d.amount),
@@ -145,30 +155,75 @@ export function ExpenseTab({ onError, onSuccess }: Props) {
 
   return (
     <div className="space-y-3">
-      {/* Date picker */}
-      <div className="px-4 flex items-center gap-2 bg-muted rounded-xl p-2 mx-4">
-        <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0" onClick={() => changeDate(-1)}>
-          <ChevronLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex-1 flex items-center justify-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="text-sm font-semibold bg-transparent outline-none text-center"
-            max={getTodayStr()}
-          />
+      {/* Date range filter */}
+      <div className="px-4 space-y-2">
+        <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          <CalendarRange className="h-3.5 w-3.5" />
+          Lọc theo khoảng ngày
         </div>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-9 w-9 shrink-0"
-          onClick={() => changeDate(1)}
-          disabled={date >= getTodayStr()}
-        >
-          <ChevronRight className="h-5 w-5" />
-        </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-[10px] text-muted-foreground">Từ ngày</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              max={dateTo}
+              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground">Đến ngày</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              min={dateFrom}
+              max={getTodayStr()}
+              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+        </div>
+        {/* Quick presets */}
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            onClick={() => { setDateFrom(getTodayStr()); setDateTo(getTodayStr()); }}
+            className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground hover:bg-muted/80"
+          >
+            Hôm nay
+          </button>
+          <button
+            onClick={() => {
+              const d = new Date();
+              d.setDate(d.getDate() - 6);
+              setDateFrom(d.toISOString().split("T")[0]);
+              setDateTo(getTodayStr());
+            }}
+            className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground hover:bg-muted/80"
+          >
+            7 ngày
+          </button>
+          <button
+            onClick={() => { setDateFrom(getMonthStartStr()); setDateTo(getTodayStr()); }}
+            className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground hover:bg-muted/80"
+          >
+            Tháng này
+          </button>
+          <button
+            onClick={() => {
+              const d = new Date();
+              d.setMonth(d.getMonth() - 1, 1);
+              const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+              const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+              const end = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+              setDateFrom(start);
+              setDateTo(end);
+            }}
+            className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground hover:bg-muted/80"
+          >
+            Tháng trước
+          </button>
+        </div>
       </div>
 
       {/* Totals */}
@@ -215,13 +270,14 @@ export function ExpenseTab({ onError, onSuccess }: Props) {
             {[1, 2].map((i) => <div key={i} className="h-12 bg-muted rounded animate-pulse" />)}
           </div>
         ) : filteredExpenses.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">Chưa có khoản chi nào ngày này</p>
+          <p className="py-6 text-center text-sm text-muted-foreground">Không có khoản chi nào trong khoảng ngày đã chọn</p>
         ) : (
           <div className="overflow-x-auto rounded-xl border bg-white">
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
                   <th className="text-left px-3 py-2 font-semibold w-10">STT</th>
+                  <th className="text-left px-3 py-2 font-semibold w-20">Ngày</th>
                   <th className="text-left px-3 py-2 font-semibold">Tên</th>
                   <th className="text-left px-3 py-2 font-semibold w-28">Loại</th>
                   <th className="text-right px-3 py-2 font-semibold w-32">Số tiền</th>
@@ -230,9 +286,12 @@ export function ExpenseTab({ onError, onSuccess }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {filteredExpenses.map((e, i) => (
+                {filteredExpenses.map((e, i) => {
+                  const [, m, d] = e.date.split("-");
+                  return (
                   <tr key={e.id} className="border-b last:border-0">
                     <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
+                    <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">{d}/{m}</td>
                     <td className="px-3 py-2 font-medium">{e.name}</td>
                     <td className="px-3 py-2">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
@@ -267,7 +326,8 @@ export function ExpenseTab({ onError, onSuccess }: Props) {
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -286,6 +346,18 @@ export function ExpenseTab({ onError, onSuccess }: Props) {
               {profile.full_name || profile.email}
             </span>
           )}
+        </div>
+
+        {/* Date picker for new entries */}
+        <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-2">
+          <label className="text-xs text-muted-foreground shrink-0">Ngày chi:</label>
+          <input
+            type="date"
+            value={newDate}
+            onChange={(e) => setNewDate(e.target.value)}
+            max={getTodayStr()}
+            className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
         </div>
         {drafts.map((d, idx) => (
           <div key={idx} className="border rounded-xl bg-white p-3 space-y-2">
