@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, Plus, Trash2, Landmark } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { CashDeposit } from "@/types/database";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatIntegerInput, parseIntegerInput } from "@/lib/utils";
 
 interface Props {
   onError: (msg: string) => void;
@@ -62,7 +62,7 @@ export function DepositTab({ onError, onSuccess }: Props) {
   };
 
   const handleAdd = async () => {
-    const amount = parseFloat(newAmount.replace(",", "."));
+    const amount = parseFloat(newAmount);
     if (!newDate || isNaN(amount) || amount <= 0) {
       onError("Vui lòng nhập ngày và số tiền hợp lệ");
       return;
@@ -142,11 +142,10 @@ export function DepositTab({ onError, onSuccess }: Props) {
               className="h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
             <input
-              type="number"
-              min="0"
-              step="any"
-              value={newAmount}
-              onChange={(e) => setNewAmount(e.target.value)}
+              type="text"
+              inputMode="numeric"
+              value={formatIntegerInput(newAmount)}
+              onChange={(e) => setNewAmount(parseIntegerInput(e.target.value))}
               placeholder="Số tiền"
               className="h-9 rounded-md border border-input bg-background px-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"
             />

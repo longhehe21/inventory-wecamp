@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, Save, Download, Upload, FileDown, GlassWater
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { DailyRevenue, RevenueSource } from "@/types/database";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatIntegerInput, parseIntegerInput } from "@/lib/utils";
 import * as XLSX from "xlsx";
 
 interface Props {
@@ -91,10 +91,11 @@ export function RevenueTab({ onError, onSuccess }: Props) {
   };
 
   const updateRow = (idx: number, field: "cash" | "transfer", val: string) => {
-    const normalized = val.replace(",", ".");
+    // Strip all non-digits — state stores raw digit string, display formats it
+    const digits = parseIntegerInput(val);
     setRows((prev) => {
       const next = [...prev];
-      next[idx] = { ...next[idx], [field]: normalized };
+      next[idx] = { ...next[idx], [field]: digits };
       return next;
     });
   };
@@ -327,10 +328,9 @@ export function RevenueTab({ onError, onSuccess }: Props) {
                       </td>
                       <td className="px-2 py-1.5">
                         <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={row.cash}
+                          type="text"
+                          inputMode="numeric"
+                          value={formatIntegerInput(row.cash)}
                           onChange={(e) => updateRow(idx, "cash", e.target.value)}
                           placeholder="0"
                           className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"
@@ -338,10 +338,9 @@ export function RevenueTab({ onError, onSuccess }: Props) {
                       </td>
                       <td className="px-2 py-1.5">
                         <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={row.transfer}
+                          type="text"
+                          inputMode="numeric"
+                          value={formatIntegerInput(row.transfer)}
                           onChange={(e) => updateRow(idx, "transfer", e.target.value)}
                           placeholder="0"
                           className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"

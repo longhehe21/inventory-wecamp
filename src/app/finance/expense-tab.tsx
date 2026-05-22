@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, Plus, Trash2, Calendar, User } from "lucide-
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { Expense, PaymentType } from "@/types/database";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatIntegerInput, parseIntegerInput } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 
 interface Props {
@@ -83,7 +83,7 @@ export function ExpenseTab({ onError, onSuccess }: Props) {
       const next = [...prev];
       const cur = next[idx];
       if (field === "amount") {
-        next[idx] = { ...cur, amount: val.replace(",", ".") };
+        next[idx] = { ...cur, amount: parseIntegerInput(val) };
       } else if (field === "payment_type") {
         next[idx] = { ...cur, payment_type: val as PaymentType };
       } else {
@@ -306,10 +306,9 @@ export function ExpenseTab({ onError, onSuccess }: Props) {
                 <option value="transfer">🏦 Chuyển khoản</option>
               </select>
               <input
-                type="number"
-                min="0"
-                step="any"
-                value={d.amount}
+                type="text"
+                inputMode="numeric"
+                value={formatIntegerInput(d.amount)}
                 onChange={(e) => updateDraft(idx, "amount", e.target.value)}
                 placeholder="Số tiền"
                 className="col-span-6 h-9 rounded-md border border-input bg-background px-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"
