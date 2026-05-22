@@ -6,7 +6,7 @@ import { Toast, useToast } from "@/components/ui/toast";
 import { DailyInputTab } from "./daily-input-tab";
 import { MonthlyReportTab } from "./monthly-report-tab";
 import { supabase } from "@/lib/supabase";
-import { Product, ProductCategory } from "@/types/database";
+import { Product, Warehouse } from "@/types/database";
 import { useAuth } from "@/contexts/auth-context";
 
 type Tab = "daily" | "monthly";
@@ -23,17 +23,16 @@ export default function InventoryPage() {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const { toast, showToast, hideToast } = useToast();
 
-  // Only employees are locked to their assigned category
+  // Only employees are locked to their assigned warehouse
   const isEmployee = profile?.role === "employee";
-  const defaultCategory: ProductCategory = isEmployee && profile?.category
-    ? (profile.category as ProductCategory)
+  const defaultWarehouse: Warehouse = isEmployee && profile?.category
+    ? (profile.category as Warehouse)
     : "Bếp";
-  const [category, setCategory] = useState<ProductCategory>(defaultCategory);
+  const [warehouse, setWarehouse] = useState<Warehouse>(defaultWarehouse);
 
-  // Sync category when profile loads
   useEffect(() => {
     if (isEmployee && profile?.category) {
-      setCategory(profile.category as ProductCategory);
+      setWarehouse(profile.category as Warehouse);
     }
   }, [isEmployee, profile?.category]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -56,12 +55,24 @@ export default function InventoryPage() {
     setDate(d.toISOString().split("T")[0]);
   };
 
-  // Memoize so children's useEffect deps don't fire on every parent re-render
-  // (e.g. toast state change would otherwise produce a new array ref every time)
+  // Products visible in current warehouse:
+  //  - Bếp / Quầy: products of that category
+  //  - Lễ tân: category === 'Lễ tân' OR in_letan flag set
   const filteredProducts = useMemo(
-    () => products.filter((p) => p.category === category),
-    [products, category]
+    () =>
+      products.filter((p) =>
+        warehouse === "Lễ tân"
+          ? p.category === "Lễ tân" || p.in_letan
+          : p.category === warehouse
+      ),
+    [products, warehouse]
   );
+
+  const warehouseStyles: Record<Warehouse, { active: string; pill: string; label: string }> = {
+    "Bếp": { active: "bg-orange-500 text-white", pill: "bg-orange-100 text-orange-700", label: "🍳 Bếp" },
+    "Quầy": { active: "bg-blue-500 text-white", pill: "bg-blue-100 text-blue-700", label: "☕ Quầy" },
+    "Lễ tân": { active: "bg-purple-500 text-white", pill: "bg-purple-100 text-purple-700", label: "🛎️ Lễ tân" },
+  };
 
   return (
     <div className="space-y-0">
@@ -69,7 +80,6 @@ export default function InventoryPage() {
       <div className="px-4 pt-4 pb-3 space-y-3">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">Tồn kho</h1>
-          {/* Employees only see daily input, not monthly report for manager view */}
           {!isEmployee && (
             <div className="flex gap-1 bg-muted rounded-lg p-1">
               <button
@@ -92,28 +102,22 @@ export default function InventoryPage() {
           )}
         </div>
 
-        {/* Category filter — hidden for employees (locked) */}
+        {/* Warehouse switcher — hidden for employees (locked to their warehouse) */}
         {isEmployee ? (
-          <div className={`flex items-center justify-center py-2.5 rounded-xl text-sm font-semibold ${
-            category === "Bếp" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
-          }`}>
-            {category === "Bếp" ? "🍳 Khu vực Bếp" : "☕ Khu vực Quầy"}
+          <div className={`flex items-center justify-center py-2.5 rounded-xl text-sm font-semibold ${warehouseStyles[warehouse].pill}`}>
+            Khu vực {warehouseStyles[warehouse].label}
           </div>
         ) : (
           <div className="flex gap-2">
-            {(["Bếp", "Quầy"] as ProductCategory[]).map((cat) => (
+            {(["Bếp", "Quầy", "Lễ tân"] as Warehouse[]).map((w) => (
               <button
-                key={cat}
-                onClick={() => setCategory(cat)}
+                key={w}
+                onClick={() => setWarehouse(w)}
                 className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
-                  category === cat
-                    ? cat === "Bếp"
-                      ? "bg-orange-500 text-white"
-                      : "bg-blue-500 text-white"
-                    : "bg-muted text-muted-foreground"
+                  warehouse === w ? warehouseStyles[w].active : "bg-muted text-muted-foreground"
                 }`}
               >
-                {cat === "Bếp" ? "🍳 Bếp" : "☕ Quầy"}
+                {warehouseStyles[w].label}
               </button>
             ))}
           </div>
@@ -148,10 +152,10 @@ export default function InventoryPage() {
         )}
       </div>
 
-      {/* Tab content */}
       {tab === "daily" ? (
         <DailyInputTab
           date={date}
+          warehouse={warehouse}
           products={filteredProducts}
           loadingProducts={loadingProducts}
           onError={(msg) => showToast(msg, "error")}
@@ -159,6 +163,7 @@ export default function InventoryPage() {
         />
       ) : (
         <MonthlyReportTab
+          warehouse={warehouse}
           products={filteredProducts}
           onError={(msg) => showToast(msg, "error")}
         />

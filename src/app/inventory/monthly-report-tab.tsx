@@ -3,11 +3,12 @@ import { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
-import { Product, InventoryDaily, ProductCategory } from "@/types/database";
+import { Product, InventoryDaily, Warehouse } from "@/types/database";
 import { formatNumber } from "@/lib/utils";
 import * as XLSX from "xlsx";
 
 interface Props {
+  warehouse: Warehouse;
   products: Product[];
   onError: (msg: string) => void;
 }
@@ -32,7 +33,7 @@ function getDaysInMonth(year: number, month: number): string[] {
   return days;
 }
 
-export function MonthlyReportTab({ products, onError }: Props) {
+export function MonthlyReportTab({ warehouse, products, onError }: Props) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
@@ -49,6 +50,7 @@ export function MonthlyReportTab({ products, onError }: Props) {
     const { data, error } = await supabase
       .from("inventory_daily")
       .select("*")
+      .eq("warehouse", warehouse)
       .gte("date", `${monthStr}-01`)
       .lte("date", lastDayStr)
       .in("product_id", products.map((p) => p.id))
@@ -57,7 +59,7 @@ export function MonthlyReportTab({ products, onError }: Props) {
     else setRecords(data || []);
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, month, products]);
+  }, [year, month, products, warehouse]);
 
   useEffect(() => { fetchRecords(); }, [fetchRecords]);
 
@@ -148,20 +150,19 @@ export function MonthlyReportTab({ products, onError }: Props) {
     return ws;
   };
 
-  // Export current category only
+  // Export current warehouse only
   const handleExportCurrent = () => {
     if (!products.length) {
       onError("Chưa có hàng hóa để xuất");
       return;
     }
-    const category = products[0].category;
     const ws = buildMonthSheet(products, records);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `${category}`);
-    XLSX.writeFile(wb, `bao-cao-${category}-${getMonthStr(year, month)}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, warehouse);
+    XLSX.writeFile(wb, `bao-cao-${warehouse}-${getMonthStr(year, month)}.xlsx`);
   };
 
-  // Export both warehouses in one workbook (2 sheets)
+  // Export all warehouses in one workbook (3 sheets)
   const handleExportAll = async () => {
     const monthStr = getMonthStr(year, month);
     const lastDay = new Date(year, month + 1, 0).getDate();
@@ -190,11 +191,15 @@ export function MonthlyReportTab({ products, onError }: Props) {
     const recs = (allRecords as InventoryDaily[]) || [];
 
     const wb = XLSX.utils.book_new();
-    (["Bếp", "Quầy"] as ProductCategory[]).forEach((cat) => {
-      const prods = allProducts.filter((p) => p.category === cat);
+    (["Bếp", "Quầy", "Lễ tân"] as Warehouse[]).forEach((wh) => {
+      const prods =
+        wh === "Lễ tân"
+          ? allProducts.filter((p) => p.category === "Lễ tân" || p.in_letan)
+          : allProducts.filter((p) => p.category === wh);
       if (!prods.length) return;
-      const ws = buildMonthSheet(prods, recs);
-      XLSX.utils.book_append_sheet(wb, ws, cat);
+      const whRecs = recs.filter((r) => r.warehouse === wh);
+      const ws = buildMonthSheet(prods, whRecs);
+      XLSX.utils.book_append_sheet(wb, ws, wh);
     });
 
     if (wb.SheetNames.length === 0) {
@@ -243,7 +248,7 @@ export function MonthlyReportTab({ products, onError }: Props) {
           disabled={loading}
         >
           <FileDown className="h-4 w-4" />
-          Xuất cả 2 kho
+          Xuất tất cả kho
         </Button>
       </div>
 

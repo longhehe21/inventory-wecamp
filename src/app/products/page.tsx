@@ -12,7 +12,7 @@ import { Product, ProductCategory, ProductUnit, PackageUnit } from "@/types/data
 import { formatNumber } from "@/lib/utils";
 import * as XLSX from "xlsx";
 
-const VALID_CATEGORIES: ProductCategory[] = ["Bếp", "Quầy"];
+const VALID_CATEGORIES: ProductCategory[] = ["Bếp", "Quầy", "Lễ tân"];
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -54,13 +54,15 @@ export default function ProductsPage() {
   // Tải file Excel mẫu
   const handleDownloadTemplate = () => {
     const ws = XLSX.utils.aoa_to_sheet([
-      ["Tên hàng hóa", "Phân loại", "Đơn vị", "Đơn vị bao bì", "Quy đổi (1 bao bì = ? đơn vị)"],
-      ["Cà chua", "Bếp", "kg", "", ""],
-      ["Gà nguyên con", "Bếp", "con", "", ""],
-      ["Sữa tươi", "Quầy", "ml", "hộp", "200"],
-      ["Cà phê hạt", "Quầy", "g", "túi", "500"],
+      ["Tên hàng hóa", "Phân loại", "Đơn vị", "Đơn vị bao bì", "Quy đổi (1 bao bì = ? đơn vị)", "Lễ tân (x)"],
+      ["Cà chua", "Bếp", "kg", "", "", ""],
+      ["Gà nguyên con", "Bếp", "con", "", "", ""],
+      ["Sữa tươi", "Quầy", "ml", "hộp", "200", ""],
+      ["Cà phê hạt", "Quầy", "g", "túi", "500", ""],
+      ["Khăn lạnh", "Lễ tân", "cái", "túi", "50", ""],
+      ["Nước suối", "Quầy", "ml", "chai", "500", "x"],
     ]);
-    ws["!cols"] = [{ wch: 25 }, { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 25 }];
+    ws["!cols"] = [{ wch: 25 }, { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 25 }, { wch: 10 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Hàng hóa");
     XLSX.writeFile(wb, "mau-hang-hoa.xlsx");
@@ -84,6 +86,7 @@ export default function ProductsPage() {
         const toInsert: {
           name: string; category: ProductCategory;
           unit: ProductUnit; package_unit: PackageUnit | null; package_size: number;
+          in_letan: boolean;
         }[] = [];
         const errors: string[] = [];
 
@@ -94,10 +97,12 @@ export default function ProductsPage() {
           const unit = String(row[2] || "").trim().toLowerCase() as ProductUnit;
           const packageUnit = String(row[3] || "").trim().toLowerCase() as PackageUnit;
           const packageSize = parseFloat(String(row[4] || "0")) || 0;
+          const letanFlag = String(row[5] || "").trim().toLowerCase();
+          const inLetan = letanFlag === "x" || letanFlag === "true" || letanFlag === "1";
 
           if (!name) continue; // bỏ qua dòng trống
           if (!VALID_CATEGORIES.includes(category)) {
-            errors.push(`Dòng ${i + 1}: Phân loại "${category}" không hợp lệ (Bếp/Quầy)`);
+            errors.push(`Dòng ${i + 1}: Phân loại "${category}" không hợp lệ (Bếp/Quầy/Lễ tân)`);
             continue;
           }
           if (!unit) {
@@ -112,6 +117,7 @@ export default function ProductsPage() {
             unit,
             package_unit: hasPkg ? packageUnit : null,
             package_size: hasPkg ? packageSize : 0,
+            in_letan: category === "Lễ tân" ? true : inLetan,
           });
         }
 
@@ -157,12 +163,19 @@ export default function ProductsPage() {
 
   const filtered = products.filter((p) => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
-    const matchCat = filterCategory === "Tất cả" || p.category === filterCategory;
+    // "Lễ tân" filter shows BOTH Lễ tân-category products AND in_letan-flagged ones
+    const matchCat =
+      filterCategory === "Tất cả"
+        ? true
+        : filterCategory === "Lễ tân"
+        ? p.category === "Lễ tân" || p.in_letan
+        : p.category === filterCategory;
     return matchSearch && matchCat;
   });
 
   const bepCount = products.filter((p) => p.category === "Bếp").length;
   const quayCount = products.filter((p) => p.category === "Quầy").length;
+  const letanCount = products.filter((p) => p.category === "Lễ tân" || p.in_letan).length;
 
   // Misconfigured: package_unit equals base unit — silently scales values
   // by package_size and produces wrong tồn đầu next day (bug from "đá")
@@ -176,7 +189,7 @@ export default function ProductsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">Hàng hóa</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">{bepCount} Bếp · {quayCount} Quầy</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{bepCount} Bếp · {quayCount} Quầy · {letanCount} Lễ tân</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" className="gap-1.5" onClick={handleDownloadTemplate}>
@@ -224,13 +237,13 @@ export default function ProductsPage() {
       {/* Excel format hint */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800">
         <p className="font-semibold mb-0.5">Format Excel import:</p>
-        <p>Cột A: Tên · B: Phân loại (Bếp/Quầy) · C: Đơn vị · D: Bao bì · E: Quy đổi</p>
+        <p>Cột A: Tên · B: Phân loại (Bếp/Quầy/Lễ tân) · C: Đơn vị · D: Bao bì · E: Quy đổi · F: Lễ tân (x = có)</p>
         <p className="mt-1">Nhấn <strong>Mẫu</strong> để tải file Excel mẫu</p>
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-2">
-        {(["Tất cả", "Bếp", "Quầy"] as const).map((cat) => (
+      <div className="flex gap-2 flex-wrap">
+        {(["Tất cả", "Bếp", "Quầy", "Lễ tân"] as const).map((cat) => (
           <button
             key={cat}
             onClick={() => setFilterCategory(cat)}
@@ -282,9 +295,14 @@ export default function ProductsPage() {
                 ) : (
                   <div className="flex items-center gap-3 p-4">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="font-semibold text-foreground truncate">{product.name}</span>
-                        <Badge variant={product.category === "Bếp" ? "bep" : "quay"}>{product.category}</Badge>
+                        <Badge variant={product.category === "Bếp" ? "bep" : product.category === "Quầy" ? "quay" : "letan"}>
+                          {product.category}
+                        </Badge>
+                        {product.in_letan && product.category !== "Lễ tân" && (
+                          <Badge variant="letan">🛎️ Lễ tân</Badge>
+                        )}
                         {product.package_unit === product.unit && product.package_size > 0 && (
                           <span title="Đơn vị bao bì trùng đơn vị tính" className="text-red-600">
                             <AlertTriangle className="h-4 w-4" />

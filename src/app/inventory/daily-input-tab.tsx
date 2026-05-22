@@ -4,7 +4,7 @@ import { Save, Upload, RefreshCw, Package, Download, Trash2, FileDown, Search, X
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase";
-import { Product, InventoryDaily } from "@/types/database";
+import { Product, InventoryDaily, Warehouse } from "@/types/database";
 import { formatNumber, formatDecimalInput, parseDecimalInput } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 import * as XLSX from "xlsx";
@@ -20,13 +20,14 @@ interface RowState {
 
 interface Props {
   date: string;
+  warehouse: Warehouse;
   products: Product[];
   loadingProducts: boolean;
   onError: (msg: string) => void;
   onSuccess: (msg: string) => void;
 }
 
-export function DailyInputTab({ date, products, loadingProducts, onError, onSuccess }: Props) {
+export function DailyInputTab({ date, warehouse, products, loadingProducts, onError, onSuccess }: Props) {
   const { profile } = useAuth();
   const [rows, setRows] = useState<RowState[]>([]);
   const [loading, setLoading] = useState(false);
@@ -43,12 +44,12 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
     s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
   const searchNorm = stripDiacritics(search.trim());
 
-  // Bếp uses package units (hộp, túi...) when properly configured.
-  // Ignore misconfigured cases where package_unit equals base unit — that
-  // would silently scale all values by package_size without any unit label
-  // change, and is almost always a data-entry mistake.
+  // Bếp + Lễ tân use package units (hộp, túi...) when properly configured.
+  // Quầy uses base units. Ignore misconfigured cases where package_unit
+  // equals base unit — that would silently scale values without any
+  // visible unit change, and is almost always a data-entry mistake.
   const usesPackageInput = (p: Product) =>
-    p.category === "Bếp"
+    (warehouse === "Bếp" || warehouse === "Lễ tân")
     && !!p.package_unit
     && p.package_size > 0
     && p.package_unit !== p.unit;
@@ -76,11 +77,13 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
           .from("inventory_daily")
           .select("product_id, closing_stock")
           .eq("date", prevStr)
+          .eq("warehouse", warehouse)
           .in("product_id", productIds),
         supabase
           .from("inventory_daily")
           .select("*")
           .eq("date", selectedDate)
+          .eq("warehouse", warehouse)
           .in("product_id", productIds),
       ]);
 
@@ -146,7 +149,8 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
       setRows(newRows);
       setLoading(false);
     },
-    []
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [warehouse]
   );
 
   useEffect(() => {
@@ -239,6 +243,7 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
       const payload = {
         product_id: row.product_id,
         date,
+        warehouse,
         opening_stock: opening,
         received,
         closing_stock: closing,
@@ -281,6 +286,7 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
       .from("inventory_daily")
       .delete()
       .eq("date", date)
+      .eq("warehouse", warehouse)
       .in("product_id", productIds);
 
     setClearing(false);
@@ -309,7 +315,7 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
       onError("Chưa có hàng hóa để xuất");
       return;
     }
-    const category = products[0]?.category ?? "";
+    const sheetLabel = warehouse;
     const header = [
       "Tên hàng hóa",
       "Đơn vị nhập",
@@ -346,8 +352,8 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
       { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 20 },
     ];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `${category} ${date}`);
-    XLSX.writeFile(wb, `ton-kho-${category}-${date}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, `${sheetLabel} ${date}`);
+    XLSX.writeFile(wb, `ton-kho-${sheetLabel}-${date}.xlsx`);
     onSuccess(`Đã xuất ${dataRows.length} hàng hóa`);
   };
 

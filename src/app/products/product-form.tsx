@@ -27,7 +27,7 @@ interface ProductFormProps {
   onError: (message: string) => void;
 }
 
-const CATEGORIES: ProductCategory[] = ["Bếp", "Quầy"];
+const CATEGORIES: ProductCategory[] = ["Bếp", "Quầy", "Lễ tân"];
 
 export function ProductForm({ product, onClose, onSaved, onError }: ProductFormProps) {
   const [form, setForm] = useState({
@@ -36,6 +36,7 @@ export function ProductForm({ product, onClose, onSaved, onError }: ProductFormP
     unit: (product?.unit ?? "") as ProductUnit,
     package_unit: (product?.package_unit ?? "") as PackageUnit | "",
     package_size: product?.package_size ? product.package_size.toString() : "",
+    in_letan: product?.in_letan ?? false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -133,6 +134,8 @@ export function ProductForm({ product, onClose, onSaved, onError }: ProductFormP
       unit: form.unit,
       package_unit: form.package_unit || null,
       package_size: form.package_unit ? (parseFloat(form.package_size) || 0) : 0,
+      // Lễ tân-only products are implicitly in Lễ tân
+      in_letan: form.category === "Lễ tân" ? true : form.in_letan,
     };
 
     if (isEdit) {
@@ -180,12 +183,30 @@ export function ProductForm({ product, onClose, onSaved, onError }: ProductFormP
               <SelectContent>
                 {CATEGORIES.map((cat) => (
                   <SelectItem key={cat} value={cat}>
-                    {cat === "Bếp" ? "🍳 Bếp" : "☕ Quầy"}
+                    {cat === "Bếp" ? "🍳 Bếp" : cat === "Quầy" ? "☕ Quầy" : "🛎️ Lễ tân"}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
+          {/* Có trong Lễ tân (chỉ áp dụng cho Bếp/Quầy) */}
+          {form.category !== "Lễ tân" && (
+            <label className="flex items-start gap-2 rounded-md border border-input bg-purple-50/50 px-3 py-2 cursor-pointer hover:bg-purple-50">
+              <input
+                type="checkbox"
+                checked={form.in_letan}
+                onChange={(e) => setForm((f) => ({ ...f, in_letan: e.target.checked }))}
+                className="mt-0.5 h-4 w-4 accent-purple-600"
+              />
+              <div className="flex-1">
+                <p className="text-sm font-medium">🛎️ Có trong kho Lễ tân</p>
+                <p className="text-xs text-muted-foreground">
+                  Hàng hóa này sẽ xuất hiện ở tab Lễ tân để nhân viên Lễ tân kiểm riêng (không ảnh hưởng tồn kho {form.category}).
+                </p>
+              </div>
+            </label>
+          )}
 
           {/* Đơn vị cơ bản */}
           <div className="space-y-1.5">

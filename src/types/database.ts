@@ -1,4 +1,8 @@
-export type ProductCategory = "Bếp" | "Quầy";
+export type ProductCategory = "Bếp" | "Quầy" | "Lễ tân";
+// Inventory tracking is per-warehouse. A product can be tracked in multiple
+// warehouses simultaneously (e.g. Bếp tracks total stock, Lễ tân tracks the
+// portion they hold for guests).
+export type Warehouse = "Bếp" | "Quầy" | "Lễ tân";
 export type ProductUnit = string;
 export type PackageUnit = string;
 export type UnitType = "base" | "package";
@@ -17,6 +21,10 @@ export interface Product {
   unit: ProductUnit;          // đơn vị cơ bản: g, kg, l, ml
   package_unit: PackageUnit | null;  // đơn vị bao bì: túi, hộp, chai...
   package_size: number;       // quy đổi: 1 bao bì = ? đơn vị cơ bản
+  // If true and category is Bếp/Quầy, the product ALSO appears in Lễ tân
+  // for separate tracking. Products with category="Lễ tân" always show up
+  // in Lễ tân regardless of this flag.
+  in_letan: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +33,7 @@ export interface InventoryDaily {
   id: string;
   product_id: string;
   date: string;
+  warehouse: Warehouse;            // which warehouse this snapshot is for
   opening_stock: number;
   received: number;
   closing_stock: number;

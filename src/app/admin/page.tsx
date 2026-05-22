@@ -187,7 +187,7 @@ export default function AdminPage() {
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Phân loại</label>
                   <div className="mt-1 flex gap-2">
-                    {(["Bếp", "Quầy"] as UserCategory[]).map((cat) => (
+                    {(["Bếp", "Quầy", "Lễ tân"] as UserCategory[]).map((cat) => (
                       <button
                         key={cat}
                         type="button"
@@ -196,11 +196,13 @@ export default function AdminPage() {
                           form.category === cat
                             ? cat === "Bếp"
                               ? "bg-orange-500 text-white border-orange-500"
-                              : "bg-blue-500 text-white border-blue-500"
+                              : cat === "Quầy"
+                              ? "bg-blue-500 text-white border-blue-500"
+                              : "bg-purple-500 text-white border-purple-500"
                             : "bg-background text-muted-foreground border-input"
                         }`}
                       >
-                        {cat === "Bếp" ? "🍳 Bếp" : "☕ Quầy"}
+                        {cat === "Bếp" ? "🍳 Bếp" : cat === "Quầy" ? "☕ Quầy" : "🛎️ Lễ tân"}
                       </button>
                     ))}
                   </div>
@@ -246,9 +248,11 @@ export default function AdminPage() {
                         <span className="font-semibold text-sm truncate">{u.full_name}</span>
                         {u.role === "employee" && u.category && (
                           <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                            u.category === "Bếp" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
+                            u.category === "Bếp" ? "bg-orange-100 text-orange-700"
+                            : u.category === "Quầy" ? "bg-blue-100 text-blue-700"
+                            : "bg-purple-100 text-purple-700"
                           }`}>
-                            {u.category === "Bếp" ? "🍳" : "☕"} {u.category}
+                            {u.category === "Bếp" ? "🍳" : u.category === "Quầy" ? "☕" : "🛎️"} {u.category}
                           </span>
                         )}
                       </div>
