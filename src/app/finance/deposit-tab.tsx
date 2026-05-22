@@ -141,14 +141,17 @@ export function DepositTab({ onError, onSuccess }: Props) {
               max={getTodayStr()}
               className="h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
-            <input
-              type="text"
-              inputMode="numeric"
-              value={formatIntegerInput(newAmount)}
-              onChange={(e) => setNewAmount(parseIntegerInput(e.target.value))}
-              placeholder="Số tiền"
-              className="h-9 rounded-md border border-input bg-background px-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={formatIntegerInput(newAmount)}
+                onChange={(e) => setNewAmount(parseIntegerInput(e.target.value))}
+                placeholder="Số tiền"
+                className="h-9 w-full rounded-md border border-input bg-background pl-2 pr-7 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">đ</span>
+            </div>
           </div>
           <input
             type="text"

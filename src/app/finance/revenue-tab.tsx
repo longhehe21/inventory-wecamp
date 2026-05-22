@@ -327,24 +327,30 @@ export function RevenueTab({ onError, onSuccess }: Props) {
                         {d}/{m}
                       </td>
                       <td className="px-2 py-1.5">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={formatIntegerInput(row.cash)}
-                          onChange={(e) => updateRow(idx, "cash", e.target.value)}
-                          placeholder="0"
-                          className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"
-                        />
+                        <div className="relative">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={formatIntegerInput(row.cash)}
+                            onChange={(e) => updateRow(idx, "cash", e.target.value)}
+                            placeholder="0"
+                            className="h-9 w-full rounded-md border border-input bg-background pl-2 pr-7 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">đ</span>
+                        </div>
                       </td>
                       <td className="px-2 py-1.5">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={formatIntegerInput(row.transfer)}
-                          onChange={(e) => updateRow(idx, "transfer", e.target.value)}
-                          placeholder="0"
-                          className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"
-                        />
+                        <div className="relative">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={formatIntegerInput(row.transfer)}
+                            onChange={(e) => updateRow(idx, "transfer", e.target.value)}
+                            placeholder="0"
+                            className="h-9 w-full rounded-md border border-input bg-background pl-2 pr-7 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">đ</span>
+                        </div>
                       </td>
                     </tr>
                   );
