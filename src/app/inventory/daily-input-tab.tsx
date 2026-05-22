@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase";
 import { Product, InventoryDaily } from "@/types/database";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, formatDecimalInput, parseDecimalInput } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 import * as XLSX from "xlsx";
 
@@ -154,8 +154,9 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
   }, [products, date, buildRows]);
 
   const updateRow = (idx: number, field: "received" | "closing_stock", val: string) => {
-    // Convert any comma decimal separator to dot (Vietnamese keyboards often produce "4,1")
-    const normalized = val.replace(",", ".");
+    // Parse "1.500,5" (vi-VN display) → "1500.5" (English internal). Also accepts
+    // bare digits / single dot — see parseDecimalInput in lib/utils for rules.
+    const normalized = parseDecimalInput(val);
     setRows((prev) => {
       const next = [...prev];
       next[idx] = { ...next[idx], [field]: normalized };
@@ -624,10 +625,9 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
                   <div>
                     <p className="text-[10px] text-muted-foreground mb-1">Nhập hàng</p>
                     <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={row.received}
+                      type="text"
+                      inputMode="decimal"
+                      value={formatDecimalInput(row.received)}
                       onChange={(e) => updateRow(idx, "received", e.target.value)}
                       className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-ring"
                       placeholder="0"
@@ -638,10 +638,9 @@ export function DailyInputTab({ date, products, loadingProducts, onError, onSucc
                   <div>
                     <p className="text-[10px] text-muted-foreground mb-1">Tồn cuối *</p>
                     <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={row.closing_stock}
+                      type="text"
+                      inputMode="decimal"
+                      value={formatDecimalInput(row.closing_stock)}
                       onChange={(e) => updateRow(idx, "closing_stock", e.target.value)}
                       className="h-10 w-full rounded-md border-2 border-primary bg-background px-2 text-sm text-center font-semibold focus:outline-none focus:ring-2 focus:ring-ring"
                       placeholder="Nhập..."

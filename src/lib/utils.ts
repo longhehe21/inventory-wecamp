@@ -29,3 +29,24 @@ export function formatIntegerInput(raw: string): string {
 export function parseIntegerInput(formatted: string): string {
   return formatted.replace(/\D/g, "");
 }
+
+// For inventory numbers that may have decimals.
+// Convention: dot = thousand separator (vi-VN, removed on parse),
+// comma = decimal separator (converted to dot internally).
+// State stores English numeric like "1500.5"; display shows "1.500,5".
+export function parseDecimalInput(s: string): string {
+  // Keep only digits and one comma; strip dots (treated as thousand sep)
+  const cleaned = s.replace(/[^\d,]/g, "").replace(/,/g, (m, i, str) => (str.indexOf(",") === i ? "." : ""));
+  return cleaned;
+}
+
+export function formatDecimalInput(raw: string): string {
+  if (!raw) return "";
+  const [intStr, ...rest] = raw.split(".");
+  const intNum = parseInt(intStr || "0", 10);
+  const intFormatted = isNaN(intNum) ? "" : intNum.toLocaleString("vi-VN");
+  if (raw.includes(".")) {
+    return intFormatted + "," + rest.join("");
+  }
+  return intFormatted;
+}
