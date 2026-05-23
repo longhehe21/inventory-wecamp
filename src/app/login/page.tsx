@@ -32,7 +32,7 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-primary text-primary-foreground shadow-lg">
             <Package className="h-8 w-8" />
           </div>
-          <h1 className="text-2xl font-bold">Phần mềm kế toán wECAMP</h1>
+          <h1 className="text-2xl font-bold">Phần mềm kế toán Wecamp</h1>
           <p className="text-sm text-muted-foreground">Quản lý Kho · Thu chi · Đối soát</p>
         </div>
 
