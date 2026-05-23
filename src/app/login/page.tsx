@@ -27,13 +27,13 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6">
-        {/* Logo */}
+        {/* Logo + Title */}
         <div className="text-center space-y-2">
           <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-primary text-primary-foreground shadow-lg">
             <Package className="h-8 w-8" />
           </div>
-          <h1 className="text-2xl font-bold">wECAMP Kho</h1>
-          <p className="text-sm text-muted-foreground">Quản lý Kho & Đối soát</p>
+          <h1 className="text-2xl font-bold">Phần mềm kế toán wECAMP</h1>
+          <p className="text-sm text-muted-foreground">Quản lý Kho · Thu chi · Đối soát</p>
         </div>
 
         {/* Form */}
@@ -83,6 +83,11 @@ export default function LoginPage() {
             {loading ? "Đang đăng nhập..." : "Đăng nhập"}
           </Button>
         </form>
+
+        {/* Designer credit */}
+        <p className="text-center text-xs text-muted-foreground pt-2">
+          Thiết kế bởi <span className="font-medium text-foreground">Hà Thành Long</span>
+        </p>
       </div>
     </div>
   );
