@@ -16,6 +16,7 @@ import {
   KeyRound,
   ChevronDown,
   Wallet,
+  Calculator,
 } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: React.ElementType; roles: string[] };
@@ -26,6 +27,7 @@ const ALL_NAV: NavItem[] = [
   { href: "/inventory", label: "Tồn kho", icon: BarChart3, roles: ["admin", "supervisor", "manager", "employee"] },
   { href: "/finance", label: "Thu chi", icon: Wallet, roles: ["admin", "supervisor", "manager"] },
   { href: "/recipes", label: "Công thức", icon: BookOpen, roles: ["admin"] },
+  { href: "/pricing", label: "Giá vốn", icon: Calculator, roles: ["admin"] },
   { href: "/reports", label: "Đối soát", icon: FileSpreadsheet, roles: ["admin", "supervisor"] },
   { href: "/fabi", label: "Fabi", icon: FileSpreadsheet, roles: ["admin"] },
   { href: "/admin", label: "Tài khoản", icon: ShieldCheck, roles: ["admin"] },
