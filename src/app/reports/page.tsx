@@ -77,7 +77,19 @@ export default function ReportsPage() {
       const recipe = recipeMap[sale.item_name.toLowerCase().trim()];
       if (!recipe) return;
       recipe.ingredients.forEach((ing) => {
-        fabiMap[ing.product_id] = (fabiMap[ing.product_id] || 0) + ing.quantity * sale.quantity;
+        // Handle 3 formats: legacy {product_id, quantity}, new product {type, product_id, qty}, overhead (skip)
+        let pid: string | null = null;
+        let qty = 0;
+        if ("type" in ing) {
+          if (ing.type === "overhead") return; // overhead không track theo product
+          pid = ing.product_id;
+          qty = ing.qty;
+        } else {
+          pid = ing.product_id;
+          qty = ing.quantity;
+        }
+        if (!pid) return;
+        fabiMap[pid] = (fabiMap[pid] || 0) + qty * sale.quantity;
       });
     });
 
